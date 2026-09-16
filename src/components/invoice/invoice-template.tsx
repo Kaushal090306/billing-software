@@ -1381,28 +1381,28 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         "invoice_title",
         "Invoice Banner",
         <div
-          className="w-full h-full relative border-b-2 flex items-center justify-center px-3 py-1 min-h-[26px]"
+          className="w-full h-full relative border-b-2 flex items-center justify-center px-4 py-2 min-h-[38px]"
           style={{
             borderColor,
             backgroundColor: isAccent ? template.themeColor : "#f8fafc",
             color: isAccent ? "#ffffff" : "#000000",
           }}
         >
-          <span className="text-[1.2em] font-black uppercase tracking-wider text-center">
+          <span className="text-[1.35em] font-black uppercase tracking-widest text-center">
             {renderET(
               "invoice_title",
               "Invoice Title Banner",
               "Tax Invoice",
               undefined,
               {
-                defaultFontSizePx: 12.0,
+                defaultFontSizePx: 15.0,
                 uppercase: true,
                 tooltip: "Invoice Title Banner",
               }
             )}
           </span>
           <span
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[1em] font-bold italic"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[1.05em] font-bold italic"
             style={{ color: isAccent ? "#ffffff" : "#000000" }}
           >
             {renderET(
@@ -1411,7 +1411,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               copyType,
               undefined,
               {
-                defaultFontSizePx: 10.0,
+                defaultFontSizePx: 11.5,
                 tooltip: "Copy Type Badge",
               }
             )}
