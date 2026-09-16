@@ -911,24 +911,24 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         "devotional",
         "Devotional & Mobile",
         <div
-          className="w-full h-full flex justify-between items-center text-[0.95em] font-bold border-b px-2 py-0.5"
+          className="w-full h-full flex justify-between items-center text-[0.95em] font-bold border-b px-3 py-2 min-h-[34px]"
           style={{ borderColor }}
         >
           <div className="w-1/4"></div>
-          <div className="w-2/4 text-center tracking-widest uppercase text-[1em]">
+          <div className="w-2/4 text-center tracking-widest uppercase text-[1.05em]">
             {renderET(
               "devotional_header",
               "Devotional Header",
               devotionalHeader,
               (val) => onUpdateSettings?.({ devotionalHeader: val }),
               {
-                defaultFontSizePx: 9.5,
+                defaultFontSizePx: 10.0,
                 uppercase: true,
                 tooltip: "Click to edit devotional header text",
               }
             )}
           </div>
-          <div className="w-1/4 text-right leading-none text-[0.9em] font-bold">
+          <div className="w-1/4 text-right leading-tight text-[0.9em] font-bold">
             <div>
               Mo.{" "}
               {renderET(
@@ -937,7 +937,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 companyMobile1,
                 (val) => onUpdateSettings?.({ phone: val }),
                 {
-                  defaultFontSizePx: 9.0,
+                  defaultFontSizePx: 9.5,
                   tooltip: "Click to edit primary mobile number",
                 }
               )}
@@ -950,7 +950,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   companyMobile2,
                   (val) => onUpdateSettings?.({ phoneAlt: val }),
                   {
-                    defaultFontSizePx: 9.0,
+                    defaultFontSizePx: 9.5,
                     tooltip: "Click to edit alternate mobile number",
                   }
                 )}
@@ -967,16 +967,16 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     const renderBrandHeader = () => {
       const logoDimensionClass =
         logoSize === "small"
-          ? "w-12 h-10"
+          ? "w-16 h-14"
           : logoSize === "large"
-          ? "w-20 h-16"
-          : "w-16 h-14";
+          ? "w-24 h-22"
+          : "w-20 h-18";
 
       return renderSectionWrapper(
         "brand_header",
         "Company Header & Logo",
         <div
-          className="w-full h-full flex items-center justify-between border-b-2 px-2 py-1 min-h-[60px]"
+          className="w-full h-full flex items-center justify-between border-b-2 px-3 py-3.5 sm:py-4.5 min-h-[105px]"
           style={{ borderColor }}
         >
           {/* Left: Dynamic Company Logo or Monogram */}
@@ -1002,11 +1002,11 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
               ) : logoType !== "none" ? (
                 <div
-                  className="border px-1.5 py-1 rounded text-center bg-white min-w-[56px]"
+                  className="border px-2 py-1.5 rounded text-center bg-white min-w-[65px]"
                   style={{ borderColor }}
                 >
                   <span
-                    className="text-[1.8em] font-black tracking-tighter block font-serif leading-none"
+                    className="text-[2em] font-black tracking-tighter block font-serif leading-none"
                     style={{
                       color:
                         template.themeColor !== "#000000"
@@ -1027,7 +1027,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     )}
                   </span>
                   <span
-                    className="text-[0.65em] font-black tracking-wider block uppercase border-t mt-0.5 pt-0.5"
+                    className="text-[0.68em] font-black tracking-wider block uppercase border-t mt-0.5 pt-0.5"
                     style={{ borderColor }}
                   >
                     {renderET(
@@ -1036,7 +1036,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       monogramSubtext,
                       (val) => onUpdateSettings?.({ monogramSubtext: val }),
                       {
-                        defaultFontSizePx: 7.0,
+                        defaultFontSizePx: 7.5,
                         uppercase: true,
                         tooltip: "Click to edit Monogram Subtext",
                       }
@@ -1202,10 +1202,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             )}
           </div>
 
-          {/* Center: Company Name, Address & GSTIN (Vertically Centered) */}
-          <div className="flex-1 text-center px-2 flex flex-col justify-center items-center">
+          {/* Center: Company Name, Address & GSTIN (Vertically Centered with generous vertical padding) */}
+          <div className="flex-1 text-center px-3 flex flex-col justify-center items-center">
             <h1
-              className="text-[1.65em] font-black tracking-tight uppercase leading-tight font-serif"
+              className="text-[1.8em] font-black tracking-tight uppercase leading-tight font-serif mb-1"
               style={{
                 color:
                   template.themeColor !== "#000000"
@@ -1219,26 +1219,26 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 companyTitle,
                 (val) => onUpdateSettings?.({ companyName: val }),
                 {
-                  defaultFontSizePx: 16.5,
+                  defaultFontSizePx: 18.0,
                   uppercase: true,
                   tooltip: "Click to edit Company Legal Name",
                 }
               )}
             </h1>
-            <p className="text-[0.9em] font-bold tracking-tight uppercase mt-0.5">
+            <p className="text-[0.95em] font-bold tracking-tight uppercase mb-1">
               {renderET(
                 "company_address",
                 "Company Address",
                 companyAddress,
                 (val) => onUpdateSettings?.({ address: val }),
                 {
-                  defaultFontSizePx: 9.0,
+                  defaultFontSizePx: 9.5,
                   uppercase: true,
                   tooltip: "Click to edit Company Address",
                 }
               )}
             </p>
-            <div className="text-[1em] font-bold tracking-tight mt-0.5">
+            <div className="text-[1.05em] font-bold tracking-tight mt-0.5">
               GSTIN No.{" "}
               <span className="font-mono font-black">
                 {renderET(
@@ -1247,7 +1247,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   companyGstin,
                   (val) => onUpdateSettings?.({ gstin: val }),
                   {
-                    defaultFontSizePx: 10.0,
+                    defaultFontSizePx: 10.5,
                     uppercase: true,
                     tooltip: "Click to edit Company GSTIN",
                   }
@@ -1261,7 +1261,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             {showQrCode ? (
               <div
                 onClick={() => interactive && setActivePopover("qr")}
-                className={`relative w-12 h-12 border p-0.5 bg-white flex flex-col items-center justify-center ${
+                className={`relative w-14 h-14 border p-0.5 bg-white flex flex-col items-center justify-center ${
                   interactive
                     ? "cursor-pointer group/qr hover:ring-2 hover:ring-purple-500 rounded"
                     : ""
@@ -1296,7 +1296,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             ) : interactive ? (
               <button
                 onClick={() => onUpdateTemplate?.({ showQrCode: true })}
-                className="w-12 h-12 border border-dashed border-zinc-300 rounded flex flex-col items-center justify-center text-[7px] text-zinc-400 hover:text-purple-600 hover:border-purple-400 cursor-pointer"
+                className="w-14 h-14 border border-dashed border-zinc-300 rounded flex flex-col items-center justify-center text-[7px] text-zinc-400 hover:text-purple-600 hover:border-purple-400 cursor-pointer"
               >
                 <QrCode className="h-4 w-4 mb-0.5" />
                 <span>Add QR</span>
@@ -1381,28 +1381,28 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         "invoice_title",
         "Invoice Banner",
         <div
-          className="w-full h-full relative border-b-2 flex items-center justify-center px-4 py-2 min-h-[38px]"
+          className="w-full h-full relative border-b-2 flex items-center justify-center px-3 py-2 min-h-[36px]"
           style={{
             borderColor,
             backgroundColor: isAccent ? template.themeColor : "#f8fafc",
             color: isAccent ? "#ffffff" : "#000000",
           }}
         >
-          <span className="text-[1.35em] font-black uppercase tracking-widest text-center">
+          <span className="text-[1.25em] font-black uppercase tracking-wider text-center">
             {renderET(
               "invoice_title",
               "Invoice Title Banner",
               "Tax Invoice",
               undefined,
               {
-                defaultFontSizePx: 15.0,
+                defaultFontSizePx: 12.5,
                 uppercase: true,
                 tooltip: "Invoice Title Banner",
               }
             )}
           </span>
           <span
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[1.05em] font-bold italic"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[1em] font-bold italic"
             style={{ color: isAccent ? "#ffffff" : "#000000" }}
           >
             {renderET(
@@ -1411,7 +1411,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               copyType,
               undefined,
               {
-                defaultFontSizePx: 11.5,
+                defaultFontSizePx: 10.0,
                 tooltip: "Copy Type Badge",
               }
             )}
@@ -1433,7 +1433,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         >
           {/* Left: Receiver Box */}
           <div
-            className="col-span-7 border-r-2 p-2 flex flex-col justify-between min-h-[110px]"
+            className="col-span-7 border-r-2 p-2.5 flex flex-col justify-between min-h-[110px]"
             style={{ borderColor }}
           >
             <div className="space-y-0.5">
@@ -1585,14 +1585,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           </div>
 
           {/* Right: Bill Metadata Box */}
-          <div className="col-span-5 text-[0.9em] leading-tight flex flex-col justify-center">
+          <div className="col-span-5 text-[0.9em] leading-tight flex flex-col justify-between">
             <div
-              className="grid grid-cols-12 border-b p-1 px-1.5"
+              className="grid grid-cols-12 border-b p-2 px-2.5 items-center min-h-[44px]"
               style={{ borderColor }}
             >
-              <span className="col-span-4 font-bold text-[0.95em]">Bill No :</span>
+              <span className="col-span-4 font-bold text-[1em]">Bill No :</span>
               <span
-                className="col-span-8 font-black text-[1.15em] font-mono text-right"
+                className="col-span-8 font-black text-[1.25em] font-mono text-right"
                 style={{
                   color:
                     template.themeColor !== "#000000"
@@ -1606,25 +1606,29 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   invoice.invoiceNo,
                   undefined,
                   {
-                    defaultFontSizePx: 11.5,
+                    defaultFontSizePx: 12.5,
                     tooltip: "Invoice Number (Sample)",
                   }
                 )}
               </span>
             </div>
             <div
-              className="grid grid-cols-12 border-b p-1 px-1.5"
+              className={`grid grid-cols-12 p-2 px-2.5 items-center min-h-[44px] ${
+                template.showAckIrn || template.showVehicleTransport || headerRightFields.length > 0
+                  ? "border-b"
+                  : ""
+              }`}
               style={{ borderColor }}
             >
-              <span className="col-span-4 font-bold text-[0.95em]">Date :</span>
-              <span className="col-span-8 font-black text-[1.05em] text-right">
+              <span className="col-span-4 font-bold text-[1em]">Date :</span>
+              <span className="col-span-8 font-black text-[1.1em] text-right">
                 {renderET(
                   "bill_date",
                   "Invoice Date",
                   invoice.date,
                   undefined,
                   {
-                    defaultFontSizePx: 10.5,
+                    defaultFontSizePx: 11.0,
                     tooltip: "Invoice Date (Sample)",
                   }
                 )}
@@ -1634,7 +1638,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             {template.showAckIrn && (
               <>
                 <div
-                  className="grid grid-cols-12 border-b p-0.5 px-1.5 text-[0.85em]"
+                  className="grid grid-cols-12 border-b p-1 px-1.5 text-[0.85em]"
                   style={{ borderColor }}
                 >
                   <span className="col-span-4 font-semibold">ACK No :</span>
@@ -1652,7 +1656,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </span>
                 </div>
                 <div
-                  className="grid grid-cols-12 border-b p-0.5 px-1.5 text-[0.85em]"
+                  className="grid grid-cols-12 border-b p-1 px-1.5 text-[0.85em]"
                   style={{ borderColor }}
                 >
                   <span className="col-span-4 font-semibold">Date :</span>
@@ -1670,7 +1674,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </span>
                 </div>
                 <div
-                  className="grid grid-cols-12 border-b p-0.5 px-1.5 text-[0.8em] leading-none"
+                  className="grid grid-cols-12 border-b p-1 px-1.5 text-[0.8em] leading-none"
                   style={{ borderColor }}
                 >
                   <span className="col-span-3 font-semibold">IRN :</span>
@@ -1694,7 +1698,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             {template.showVehicleTransport && (
               <>
                 <div
-                  className="grid grid-cols-12 border-b p-0.5 px-1.5 text-[0.85em]"
+                  className="grid grid-cols-12 border-b p-1 px-1.5 text-[0.85em]"
                   style={{ borderColor }}
                 >
                   <span className="col-span-4 font-semibold">
@@ -1714,7 +1718,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </span>
                 </div>
                 <div
-                  className="grid grid-cols-12 border-b p-0.5 px-1.5 text-[0.85em]"
+                  className="grid grid-cols-12 border-b p-1 px-1.5 text-[0.85em]"
                   style={{ borderColor }}
                 >
                   <span className="col-span-4 font-semibold">Vehicle No :</span>
@@ -1732,7 +1736,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </span>
                 </div>
                 <div
-                  className="grid grid-cols-12 p-0.5 px-1.5 text-[0.85em]"
+                  className="grid grid-cols-12 p-1 px-1.5 text-[0.85em]"
                   style={{ borderColor }}
                 >
                   <span className="col-span-4 font-semibold">Transport :</span>
@@ -1756,7 +1760,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             {headerRightFields.map((cf) => (
               <div
                 key={cf.id}
-                className="grid grid-cols-12 border-t p-0.5 px-1.5 text-[0.85em]"
+                className="grid grid-cols-12 border-t p-1 px-1.5 text-[0.85em]"
                 style={{ borderColor }}
               >
                 <span className="col-span-4 font-semibold">

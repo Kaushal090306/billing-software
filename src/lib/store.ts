@@ -55,8 +55,8 @@ export const INVOICE_ELEMENTS: InvoiceElementMeta[] = [
   { key: "company_name", label: "Company Legal Name", defaultFontSizePx: 16.5, section: "Header" },
   { key: "company_address", label: "Company Address", defaultFontSizePx: 9.0, section: "Header" },
   { key: "company_gstin", label: "Company GSTIN", defaultFontSizePx: 10.0, section: "Header" },
-  { key: "invoice_title", label: "Tax Invoice Banner Title", defaultFontSizePx: 15.0, section: "Title" },
-  { key: "invoice_copy_type", label: "Copy Type Badge", defaultFontSizePx: 11.5, section: "Title" },
+  { key: "invoice_title", label: "Tax Invoice Banner Title", defaultFontSizePx: 12.0, section: "Title" },
+  { key: "invoice_copy_type", label: "Copy Type Badge", defaultFontSizePx: 10.0, section: "Title" },
   { key: "receiver_title", label: "Receiver Box Title", defaultFontSizePx: 10.5, section: "Receiver" },
   { key: "receiver_name", label: "Buyer / Customer Name", defaultFontSizePx: 11.0, section: "Receiver" },
   { key: "receiver_address", label: "Buyer Address", defaultFontSizePx: 9.5, section: "Receiver" },
@@ -333,7 +333,7 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
   {
     id: "tpl_standard_gst",
     name: "Standard Surat GST Bill",
-    description: "Official Surat GST Textile & Jari Tax Invoice with detailed ACK, IRN, and Bank Details",
+    description: "Official Surat GST Textile & Jari Tax Invoice with Bank Details",
     isDefault: true,
     themeColor: "#000000",
     fontFamily: "Plus Jakarta Sans",
@@ -345,8 +345,8 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
     watermarkText: "ORIGINAL",
     showQrCode: true,
     showDevotionalHeader: true,
-    showAckIrn: true,
-    showVehicleTransport: true,
+    showAckIrn: false,
+    showVehicleTransport: false,
     showConsignee: false,
     showBankDetails: true,
     showAmountInWords: true,
@@ -354,14 +354,11 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
     showSignature: true,
     showTaxBreakdown: true,
     showDiscount: true,
-    customFields: [
-      { id: "cf_1", label: "Agent / Broker", value: "Direct", placement: "header_right" },
-      { id: "cf_2", label: "L.R. No.", value: "", placement: "header_right" },
-    ],
+    customFields: [],
     sectionsOrder: [
-      { id: "devotional", name: "Devotional Header & Phone Numbers", enabled: true },
-      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true },
-      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true },
+      { id: "devotional", name: "Devotional Header & Phone Numbers", enabled: true, heightPx: 34 },
+      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true, heightPx: 110 },
+      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true, heightPx: 36 },
       { id: "receiver_meta", name: "Receiver Details & Bill Metadata Box", enabled: true },
       { id: "consignee", name: "Consignee / Shipped To (Optional)", enabled: false },
       { id: "items_table", name: "Itemized Product Table & GST Slabs", enabled: true },
@@ -386,7 +383,7 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
     showQrCode: true,
     showDevotionalHeader: true,
     showAckIrn: false,
-    showVehicleTransport: true,
+    showVehicleTransport: false,
     showConsignee: false,
     showBankDetails: true,
     showAmountInWords: true,
@@ -396,9 +393,9 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
     showDiscount: true,
     customFields: [],
     sectionsOrder: [
-      { id: "devotional", name: "Devotional Header & Phone Numbers", enabled: true },
-      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true },
-      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true },
+      { id: "devotional", name: "Devotional Header & Phone Numbers", enabled: true, heightPx: 34 },
+      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true, heightPx: 110 },
+      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true, heightPx: 36 },
       { id: "receiver_meta", name: "Receiver Details & Bill Metadata Box", enabled: true },
       { id: "items_table", name: "Itemized Product Table & GST Slabs", enabled: true },
       { id: "words_bank_tax", name: "Amount in Words, Bank Details & Tax Summary", enabled: true },
@@ -420,8 +417,8 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
     watermarkText: "ORIGINAL",
     showQrCode: true,
     showDevotionalHeader: true,
-    showAckIrn: true,
-    showVehicleTransport: true,
+    showAckIrn: false,
+    showVehicleTransport: false,
     showConsignee: true,
     showBankDetails: true,
     showAmountInWords: true,
@@ -429,15 +426,11 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
     showSignature: true,
     showTaxBreakdown: true,
     showDiscount: true,
-    customFields: [
-      { id: "cf_lr", label: "L.R. No.", value: "", placement: "header_right" },
-      { id: "cf_broker", label: "Broker / Agent", value: "", placement: "receiver_box" },
-      { id: "cf_cases", label: "No. of Cases / Bags", value: "", placement: "footer_left" },
-    ],
+    customFields: [],
     sectionsOrder: [
-      { id: "devotional", name: "Devotional Header & Phone Numbers", enabled: true },
-      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true },
-      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true },
+      { id: "devotional", name: "Devotional Header & Phone Numbers", enabled: true, heightPx: 34 },
+      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true, heightPx: 110 },
+      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true, heightPx: 36 },
       { id: "receiver_meta", name: "Receiver Details & Bill Metadata Box", enabled: true },
       { id: "consignee", name: "Consignee / Shipped To (Optional)", enabled: true },
       { id: "items_table", name: "Itemized Product Table & GST Slabs", enabled: true },
@@ -472,8 +465,8 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
     showDiscount: false,
     customFields: [],
     sectionsOrder: [
-      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true },
-      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true },
+      { id: "brand_header", name: "Company Brand Header (Logo/Title/GST/QR)", enabled: true, heightPx: 110 },
+      { id: "invoice_title", name: "Tax Invoice Banner & Copy Label", enabled: true, heightPx: 36 },
       { id: "receiver_meta", name: "Receiver Details & Bill Metadata Box", enabled: true },
       { id: "items_table", name: "Itemized Product Table & GST Slabs", enabled: true },
       { id: "words_bank_tax", name: "Amount in Words, Bank Details & Tax Summary", enabled: true },
@@ -1461,7 +1454,16 @@ export class BillingStore {
   static getTemplates(): InvoiceTemplateConfig[] {
     const settings = this.getSettings();
     if (settings.templates && settings.templates.length > 0) {
-      return settings.templates;
+      return settings.templates.map((t) => ({
+        ...t,
+        customFields: (t.customFields || []).filter(
+          (cf) =>
+            cf.id !== "cf_1" &&
+            cf.id !== "cf_2" &&
+            cf.id !== "cf_lr" &&
+            cf.id !== "cf_broker"
+        ),
+      }));
     }
     return defaultInvoiceTemplates;
   }
