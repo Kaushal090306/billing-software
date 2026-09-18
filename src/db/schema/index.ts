@@ -117,6 +117,9 @@ export const invoices = pgTable("invoices", {
   dueDate: text("due_date"),
   notes: text("notes"),
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+  billType: text("bill_type").default("gst"),
+  sourceRawBillIds: jsonb("source_raw_bill_ids"),
+  convertedToInvoiceId: text("converted_to_invoice_id"),
 });
 
 // 5. Payments

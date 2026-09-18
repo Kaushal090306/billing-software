@@ -16,6 +16,7 @@ import {
   generateNextInvoiceNumber,
   formatINR,
   formatNumber,
+  numberToWordsIndian,
   buildWhatsAppInvoiceShareUrl,
 } from "@/lib/billing-utils";
 import { downloadInvoicePDF } from "@/lib/pdf-download";
@@ -62,6 +63,8 @@ function NewInvoiceContent() {
   const router = useRouter();
   const duplicateFromId = searchParams.get("duplicateFrom");
   const preselectedCustomerId = searchParams.get("customerId");
+  const convertRawBillIdsParam = searchParams.get("convertRawBills");
+  const initialBillType = searchParams.get("billType") === "raw" ? "raw" : "gst";
 
   const { setOpen } = useSidebar();
 
@@ -89,6 +92,10 @@ function NewInvoiceContent() {
     templates.find((t) => t.id === selectedTemplateId) ||
     templates[0];
 
+  // Bill Type: GST Tax Invoice vs Raw Bill (Non-GST)
+  const [billType, setBillType] = useState<"gst" | "raw">(initialBillType);
+  const [sourceRawBillIds, setSourceRawBillIds] = useState<string[]>([]);
+
   // Form State
   const [invoiceNo, setInvoiceNo] = useState<string>("");
   const [invoiceDate, setInvoiceDate] = useState<string>("");
@@ -97,26 +104,23 @@ function NewInvoiceContent() {
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] =
     useState<boolean>(false);
 
-  // Customer autofill fields
+  // Customer autofill fields - All EMPTY by default!
   const [customerName, setCustomerName] = useState<string>("");
   const [customerGstin, setCustomerGstin] = useState<string>("");
   const [customerAddress, setCustomerAddress] = useState<string>("");
-  const [customerCity, setCustomerCity] = useState<string>("SURAT");
-  const [customerState, setCustomerState] = useState<string>("Gujarat");
-  const [customerStateCode, setCustomerStateCode] = useState<string>("24");
+  const [customerCity, setCustomerCity] = useState<string>("");
+  const [customerState, setCustomerState] = useState<string>("");
+  const [customerStateCode, setCustomerStateCode] = useState<string>("");
   const [customerMobile, setCustomerMobile] = useState<string>("");
 
-  // Transport & E-Invoice Fields
+  // Transport Fields
   const [showTransportFields, setShowTransportFields] =
-    useState<boolean>(false);
+    useState<boolean>(true);
   const [vehicleNo, setVehicleNo] = useState<string>("");
   const [ewayBillNo, setEwayBillNo] = useState<string>("");
-  const [ackNo, setAckNo] = useState<string>("");
-  const [ackDate, setAckDate] = useState<string>("");
-  const [irn, setIrn] = useState<string>("");
   const [transportNo, setTransportNo] = useState<string>("");
 
-  // Invoice Line Items
+  // Invoice Line Items - Start with clean blank row
   const [items, setItems] = useState<
     Array<{
       id: string;
@@ -126,31 +130,26 @@ function NewInvoiceContent() {
       quantity: string | number;
       unit: string;
       rate: string | number;
+      pricePerPiece?: string | number;
+      finalAmount?: string | number;
       gstRate: number;
       suggestedRate: number | null;
+      lastEditedField?: "rate" | "pricePerPiece" | "finalAmount";
     }>
   >([
     {
       id: "row_1",
-      productId: "prod_1",
-      productName: "VISCOSE YARN (54033100)",
-      hsn: "5403",
-      quantity: "63.000",
-      unit: "KG",
-      rate: "328.5714",
-      gstRate: 5,
-      suggestedRate: 328.5714,
-    },
-    {
-      id: "row_2",
-      productId: "prod_2",
-      productName: "JARI KASAB (56050020)",
+      productId: "",
+      productName: "",
       hsn: "5605",
-      quantity: "243.77",
+      quantity: "",
       unit: "KG",
-      rate: "333.3333",
-      gstRate: 5,
-      suggestedRate: 333.3333,
+      rate: "",
+      pricePerPiece: "",
+      finalAmount: "",
+      gstRate: initialBillType === "raw" ? 0 : 5,
+      suggestedRate: null,
+      lastEditedField: "pricePerPiece",
     },
   ]);
 
@@ -265,28 +264,19 @@ function NewInvoiceContent() {
     const yyyy = today.getFullYear();
     setInvoiceDate(`${dd}/${mm}/${yyyy}`);
 
-    // Default to first customer if not yet selected
-    if (loadedCustomers.length > 0 && !selectedCustomerId && !customerName) {
-      const defaultCust = loadedCustomers[0];
-      setSelectedCustomerId(defaultCust.id);
-      setCustomerName(defaultCust.businessName);
-      setCustomerGstin(defaultCust.gstin || "");
-      setCustomerAddress(defaultCust.address || "");
-      setCustomerCity(defaultCust.city || "SURAT");
-      setCustomerState(defaultCust.state || "Gujarat");
-      setCustomerStateCode(defaultCust.stateCode || "24");
-      setCustomerMobile(defaultCust.mobile || "");
-      setCustomerSearch(defaultCust.businessName);
-    }
-
     // Generate Next Invoice Number
-    const lastInv = loadedInvoices[0]?.invoiceNo || "MTJ/144";
-    const nextNo = generateNextInvoiceNumber(
-      lastInv,
-      loadedSettings.invoicePrefix || "MTJ",
-      loadedSettings.financialYear || "2026-27"
-    );
-    setInvoiceNo(nextNo);
+    if (billType === "raw") {
+      const rawCount = loadedInvoices.filter((i) => i.billType === "raw").length;
+      setInvoiceNo(`RAW/${rawCount + 101}`);
+    } else {
+      const lastGstInv = loadedInvoices.find((i) => i.billType !== "raw")?.invoiceNo || "MTJ/144";
+      const nextNo = generateNextInvoiceNumber(
+        lastGstInv,
+        loadedSettings.invoicePrefix || "MTJ",
+        loadedSettings.financialYear || "2026-27"
+      );
+      setInvoiceNo(nextNo);
+    }
 
     // Check duplicateFrom param
     if (duplicateFromId) {
@@ -300,21 +290,130 @@ function NewInvoiceContent() {
         setCustomerState(srcInv.customerState);
         setCustomerStateCode(srcInv.customerStateCode);
         setCustomerMobile(srcInv.customerMobile);
+        setCustomerSearch(srcInv.customerName);
 
         setItems(
-          srcInv.items.map((it, idx) => ({
-            id: `row_${Date.now()}_${idx}`,
-            productId: it.productId,
-            productName: it.productName,
-            hsn: it.hsn,
-            quantity: it.quantity,
-            unit: it.unit,
-            rate: it.rate,
-            gstRate: it.gstRate,
-            suggestedRate: it.rate,
-          }))
+          srcInv.items.map((it, idx) => {
+            const net = Number(it.netAmount) || Number(it.taxableAmount) || 0;
+            const q = Number(it.quantity) || 0;
+            const ppp = it.pricePerPiece ? Number(it.pricePerPiece) : (q > 0 ? net / q : 0);
+            return {
+              id: `row_${Date.now()}_${idx}`,
+              productId: it.productId,
+              productName: it.productName,
+              hsn: it.hsn,
+              quantity: it.quantity,
+              unit: it.unit,
+              rate: it.rate,
+              pricePerPiece: ppp > 0 ? ppp.toFixed(2) : "",
+              finalAmount: net > 0 ? net.toFixed(2) : "",
+              gstRate: it.gstRate,
+              suggestedRate: it.rate,
+            };
+          })
         );
         toast.info(`Cloned invoice details from ${srcInv.invoiceNo}`);
+      }
+    } else if (convertRawBillIdsParam) {
+      // Convert selected Raw Bills into a single official GST Invoice
+      const rawIds = convertRawBillIdsParam.split(",").filter(Boolean);
+      setSourceRawBillIds(rawIds);
+      setBillType("gst");
+
+      const rawBills = rawIds
+        .map((id) => BillingStore.getInvoiceById(id))
+        .filter(Boolean) as Invoice[];
+
+      if (rawBills.length > 0) {
+        const firstRb = rawBills[0];
+        const cust = loadedCustomers.find((c) => c.id === firstRb.customerId);
+        if (cust) {
+          handleSelectCustomer(cust);
+        } else {
+          setSelectedCustomerId(firstRb.customerId);
+          setCustomerName(firstRb.customerName);
+          setCustomerGstin(firstRb.customerGstin || "");
+          setCustomerAddress(firstRb.customerAddress || "");
+          setCustomerCity(firstRb.customerCity || "SURAT");
+          setCustomerState(firstRb.customerState || "Gujarat");
+          setCustomerStateCode(firstRb.customerStateCode || "24");
+          setCustomerMobile(firstRb.customerMobile || "");
+          setCustomerSearch(firstRb.customerName);
+        }
+
+        // Product aggregation: if products are same in raw bill then in final bill total the quantity!
+        const productGroups: Record<
+          string,
+          {
+            productId: string;
+            productName: string;
+            hsn: string;
+            unit: string;
+            quantity: number;
+            rawTotalAmount: number;
+            gstRate: number;
+          }
+        > = {};
+
+        let totalRawBillsAmount = 0;
+        for (const rb of rawBills) {
+          totalRawBillsAmount += Number(rb.grandTotal) || 0;
+          for (const it of rb.items) {
+            const key = (it.productId || it.productName).trim().toUpperCase();
+            if (!productGroups[key]) {
+              const matchedProd = BillingStore.getProducts().find(
+                (p) =>
+                  p.id === it.productId ||
+                  p.name.toUpperCase() === it.productName.toUpperCase()
+              );
+              const gst = matchedProd ? matchedProd.gstRate : (it.gstRate || 5);
+              productGroups[key] = {
+                productId: it.productId || "",
+                productName: it.productName,
+                hsn: it.hsn || "5605",
+                unit: it.unit || "KG",
+                quantity: 0,
+                rawTotalAmount: 0,
+                gstRate: gst || 5,
+              };
+            }
+            productGroups[key].quantity += Number(it.quantity) || 0;
+            const itemAmt =
+              Number(it.netAmount) ||
+              Number(it.taxableAmount) ||
+              Number(it.quantity) * Number(it.rate) ||
+              0;
+            productGroups[key].rawTotalAmount += itemAmt;
+          }
+        }
+
+        // Calculate backward GST-inclusive base rates so total matches exactly:
+        const aggregatedItems = Object.values(productGroups).map((grp, idx) => {
+          const gst = grp.gstRate || 5;
+          const multiplier = 1 + gst / 100;
+          const baseTaxable = Math.round((grp.rawTotalAmount / multiplier) * 100) / 100;
+          const unitRate = grp.quantity > 0 ? baseTaxable / grp.quantity : 0;
+          const ppp = grp.quantity > 0 ? grp.rawTotalAmount / grp.quantity : 0;
+          return {
+            id: `row_conv_${Date.now()}_${idx}`,
+            productId: grp.productId,
+            productName: grp.productName,
+            hsn: grp.hsn,
+            quantity: String(Math.round(grp.quantity * 1000) / 1000),
+            unit: grp.unit,
+            rate: unitRate.toFixed(4),
+            pricePerPiece: ppp > 0 ? ppp.toFixed(2) : "",
+            finalAmount: grp.rawTotalAmount.toFixed(2),
+            gstRate: gst,
+            suggestedRate: unitRate,
+          };
+        });
+
+        setItems(aggregatedItems);
+        setCustomGrandTotal(totalRawBillsAmount.toFixed(2));
+        toast.success(
+          `Loaded ${rawBills.length} Raw Bills! Final GST Total preserved at ${formatINR(totalRawBillsAmount)}`
+        );
       }
     } else if (preselectedCustomerId) {
       const cust = loadedCustomers.find((c) => c.id === preselectedCustomerId);
@@ -328,7 +427,7 @@ function NewInvoiceContent() {
       unsubscribe();
       window.removeEventListener("focus", refreshData);
     };
-  }, [duplicateFromId, preselectedCustomerId]);
+  }, [duplicateFromId, preselectedCustomerId, convertRawBillIdsParam]);
 
 
   // Handle Customer Selection & Auto-fill
@@ -473,15 +572,24 @@ function NewInvoiceContent() {
 
     setItems((prev) => {
       const updated = [...prev];
+      const isRaw = billType === "raw";
+      const rt = suggested !== null ? suggested : prod.defaultRate;
+      const gst = isRaw ? 0 : prod.gstRate;
+      const ppp = isRaw ? rt : rt * (1 + gst / 100);
+      const qNum = Number(updated[index].quantity) || 0;
+
       updated[index] = {
         ...updated[index],
         productId: prod.id,
         productName: prod.name,
         hsn: prod.hsn,
         unit: prod.unit,
-        gstRate: prod.gstRate,
-        rate: suggested !== null ? suggested : prod.defaultRate,
+        gstRate: isRaw ? 0 : prod.gstRate,
+        rate: isRaw ? rt.toFixed(2) : rt,
+        pricePerPiece: ppp > 0 ? ppp.toFixed(2) : "",
+        finalAmount: qNum > 0 && ppp > 0 ? (qNum * ppp).toFixed(2) : updated[index].finalAmount,
         suggestedRate: suggested,
+        lastEditedField: "pricePerPiece",
       };
       return updated;
     });
@@ -495,56 +603,196 @@ function NewInvoiceContent() {
         id: `row_${Date.now()}`,
         productId: "",
         productName: "",
-        hsn: "5605002",
+        hsn: "5605",
         quantity: "",
         unit: "KG",
         rate: "",
-        gstRate: 5,
+        pricePerPiece: "",
+        finalAmount: "",
+        gstRate: billType === "raw" ? 0 : 5,
         suggestedRate: null,
+        lastEditedField: "pricePerPiece",
       },
     ]);
   };
 
   // Remove Item Row
   const handleRemoveItem = (index: number) => {
-    if (items.length === 1) {
-      toast.warning("Invoice must contain at least one item");
+    if (items.length <= 1) {
+      toast.info("Invoice must contain at least 1 line item");
       return;
     }
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Check Interstate vs Intra-state
+  // Customer selection helper
   const isInterstate = useMemo(() => {
-    return (
-      customerStateCode &&
-      settings.stateCode &&
-      customerStateCode !== settings.stateCode
-    );
+    if (!customerStateCode) return false;
+    const cleanCustomerCode = customerStateCode.replace(/\D/g, "");
+    const cleanCompanyCode = (settings.stateCode || "24").replace(/\D/g, "");
+    return cleanCustomerCode !== cleanCompanyCode;
   }, [customerStateCode, settings.stateCode]);
 
   // Real-time Summary Calculations with Discount & Custom Grand Total
   const summary = useMemo(() => {
-    const validItems = items.map((it) => ({
-      quantity: Number(it.quantity) || 0,
-      rate: Number(it.rate) || 0,
-      gstRate: Number(it.gstRate) || 5,
-    }));
-    return calculateInvoiceSummary(
-      validItems,
-      isInterstate,
-      roundOffMode,
-      Number(discount) || 0,
-      customGrandTotal ? Number(customGrandTotal) : null
-    );
-  }, [items, isInterstate, roundOffMode, discount, customGrandTotal]);
+    let totalQty = 0;
+    let totalTaxable = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
+    let rawTotal = 0;
+
+    const isRaw = billType === "raw";
+
+    items.forEach((it) => {
+      const qty = Number(it.quantity) || 0;
+      const rt = Number(it.rate) || 0;
+      const gst = isRaw ? 0 : (Number(it.gstRate) || 0);
+
+      if (isRaw) {
+        // Raw Bill: Total is purely Rate * Qty or entered Total Amount, ZERO GST!
+        const lineTotal = it.finalAmount && Number(it.finalAmount) > 0
+          ? Number(it.finalAmount)
+          : Math.round(qty * rt * 100) / 100;
+
+        totalQty += qty;
+        totalTaxable += lineTotal;
+        rawTotal += lineTotal;
+      } else {
+        const calc = calculateItemRow(qty, rt, gst, isInterstate);
+
+        let itemTaxable = calc.taxableAmount;
+        let itemCgst = calc.cgstAmount;
+        let itemSgst = calc.sgstAmount;
+        let itemIgst = calc.igstAmount;
+        let itemTotal = calc.totalAmount;
+
+        if (it.finalAmount && Number(it.finalAmount) > 0 && gst > 0) {
+          const fa = Number(it.finalAmount);
+          const totalGst = Math.round((fa * (gst / (100 + gst))) * 100) / 100;
+          itemTaxable = Math.round((fa - totalGst) * 100) / 100;
+          if (isInterstate) {
+            itemIgst = totalGst;
+            itemCgst = 0;
+            itemSgst = 0;
+          } else {
+            itemCgst = Math.round((totalGst / 2) * 100) / 100;
+            itemSgst = Math.round((totalGst - itemCgst) * 100) / 100;
+            itemIgst = 0;
+          }
+          itemTotal = fa;
+        }
+
+        totalQty += qty;
+        totalTaxable += itemTaxable;
+        totalCgst += itemCgst;
+        totalSgst += itemSgst;
+        totalIgst += itemIgst;
+        rawTotal += itemTotal;
+      }
+    });
+
+    const disc = Math.max(0, Number(discount) || 0);
+    rawTotal = Math.max(0, rawTotal - disc);
+
+    let finalTotal = rawTotal;
+    let roundOff = 0;
+
+    if (customGrandTotal !== undefined && customGrandTotal !== null && customGrandTotal !== "" && !isNaN(Number(customGrandTotal))) {
+      finalTotal = Math.max(0, Number(customGrandTotal));
+      roundOff = Math.round((finalTotal - rawTotal) * 100) / 100;
+    } else {
+      if (isRaw) {
+        finalTotal = Math.round(rawTotal * 100) / 100;
+        roundOff = 0;
+      } else if (roundOffMode === "nearest_1") {
+        finalTotal = Math.round(rawTotal);
+        roundOff = Math.round((finalTotal - rawTotal) * 100) / 100;
+      } else if (roundOffMode === "nearest_5") {
+        finalTotal = Math.round(rawTotal / 5) * 5;
+        roundOff = Math.round((finalTotal - rawTotal) * 100) / 100;
+      } else if (roundOffMode === "nearest_10") {
+        finalTotal = Math.round(rawTotal / 10) * 10;
+        roundOff = Math.round((finalTotal - rawTotal) * 100) / 100;
+      }
+    }
+
+    const amountInWords = numberToWordsIndian(finalTotal);
+
+    return {
+      totalQty: Math.round(totalQty * 1000) / 1000,
+      totalTaxable: Math.round(totalTaxable * 100) / 100,
+      totalCgst: isRaw ? 0 : Math.round(totalCgst * 100) / 100,
+      totalSgst: isRaw ? 0 : Math.round(totalSgst * 100) / 100,
+      totalIgst: isRaw ? 0 : Math.round(totalIgst * 100) / 100,
+      discount: disc,
+      roundOff,
+      grandTotal: finalTotal,
+      amountInWords,
+    };
+  }, [items, isInterstate, roundOffMode, discount, customGrandTotal, billType]);
 
   // LIVE INVOICE OBJECT FOR REAL-TIME RIGHT PREVIEW
   const liveInvoice: Invoice = useMemo(() => {
+    const isRaw = billType === "raw";
     const calculatedItems: InvoiceItem[] = items.map((it, idx) => {
       const qty = Number(it.quantity) || 0;
       const rt = Number(it.rate) || 0;
-      const calc = calculateItemRow(qty, rt, it.gstRate, isInterstate);
+      const gst = isRaw ? 0 : (Number(it.gstRate) || 0);
+
+      if (isRaw) {
+        const lineTotal = it.finalAmount && Number(it.finalAmount) > 0
+          ? Number(it.finalAmount)
+          : Math.round(qty * rt * 100) / 100;
+        const derivedRate = qty > 0 ? Math.round((lineTotal / qty) * 100) / 100 : rt;
+
+        return {
+          id: it.id || `live_${idx}`,
+          productId: it.productId || `prod_${idx}`,
+          productName: (it.productName || "JARI ITEM").toUpperCase(),
+          hsn: it.hsn || "5605",
+          quantity: qty,
+          unit: it.unit || "KG",
+          rate: derivedRate,
+          pricePerPiece: derivedRate,
+          taxableAmount: lineTotal,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          netAmount: lineTotal,
+        };
+      }
+
+      const calc = calculateItemRow(qty, rt, gst, isInterstate);
+
+      let itemTaxable = calc.taxableAmount;
+      let itemCgst = calc.cgstAmount;
+      let itemSgst = calc.sgstAmount;
+      let itemIgst = calc.igstAmount;
+      let itemTotal = calc.totalAmount;
+
+      if (it.finalAmount && Number(it.finalAmount) > 0 && gst > 0) {
+        const fa = Number(it.finalAmount);
+        const totalGst = Math.round((fa * (gst / (100 + gst))) * 100) / 100;
+        itemTaxable = Math.round((fa - totalGst) * 100) / 100;
+        if (isInterstate) {
+          itemIgst = totalGst;
+          itemCgst = 0;
+          itemSgst = 0;
+        } else {
+          itemCgst = Math.round((totalGst / 2) * 100) / 100;
+          itemSgst = Math.round((totalGst - itemCgst) * 100) / 100;
+          itemIgst = 0;
+        }
+        itemTotal = fa;
+      }
+
+      let derivedRate = rt;
+      if (it.finalAmount && Number(it.finalAmount) > 0 && qty > 0) {
+        derivedRate = Math.round((itemTaxable / qty) * 10000) / 10000;
+      }
+      const ppp = it.pricePerPiece ? Number(it.pricePerPiece) : (qty > 0 ? itemTotal / qty : 0);
 
       return {
         id: it.id || `live_${idx}`,
@@ -553,13 +801,14 @@ function NewInvoiceContent() {
         hsn: it.hsn || "5605",
         quantity: qty,
         unit: it.unit || "KG",
-        rate: rt,
-        taxableAmount: calc.taxableAmount,
+        rate: derivedRate,
+        pricePerPiece: ppp > 0 ? Math.round(ppp * 100) / 100 : undefined,
+        taxableAmount: itemTaxable,
         gstRate: it.gstRate,
-        cgstAmount: calc.cgstAmount,
-        sgstAmount: calc.sgstAmount,
-        igstAmount: calc.igstAmount,
-        netAmount: calc.totalAmount,
+        cgstAmount: itemCgst,
+        sgstAmount: itemSgst,
+        igstAmount: itemIgst,
+        netAmount: itemTotal,
       };
     });
 
@@ -579,11 +828,6 @@ function NewInvoiceContent() {
       customerStateCode: customerStateCode.trim() || "24",
       customerMobile: customerMobile.trim() || "9723544545",
 
-      ackNo: ackNo.trim() || "162625465338519",
-      ackDate: ackDate.trim() || "02/08/2026 11:17:00 AM",
-      irn:
-        irn.trim() ||
-        "124530801ecefda7fd4e0972ffe7a9a50d8f8f30e60086b9fe88e8e6828bb9ec",
       ewayBillNo: ewayBillNo.trim(),
       vehicleNo: vehicleNo.trim(),
       transportNo: transportNo.trim(),
@@ -591,9 +835,9 @@ function NewInvoiceContent() {
       items: calculatedItems,
       totalQuantity: summary.totalQty,
       totalTaxable: summary.totalTaxable,
-      totalCgst: summary.totalCgst,
-      totalSgst: summary.totalSgst,
-      totalIgst: summary.totalIgst,
+      totalCgst: billType === "raw" ? 0 : summary.totalCgst,
+      totalSgst: billType === "raw" ? 0 : summary.totalSgst,
+      totalIgst: billType === "raw" ? 0 : summary.totalIgst,
       discount: summary.discount,
       roundOff: summary.roundOff,
       grandTotal: summary.grandTotal,
@@ -603,6 +847,8 @@ function NewInvoiceContent() {
       paidAmount: 0,
       remainingAmount: summary.grandTotal,
       createdAt: new Date().toISOString(),
+      billType,
+      sourceRawBillIds: sourceRawBillIds.length > 0 ? sourceRawBillIds : undefined,
     };
   }, [
     invoiceNo,
@@ -615,15 +861,14 @@ function NewInvoiceContent() {
     customerState,
     customerStateCode,
     customerMobile,
-    ackNo,
-    ackDate,
-    irn,
     ewayBillNo,
     vehicleNo,
     transportNo,
     items,
     isInterstate,
     summary,
+    billType,
+    sourceRawBillIds,
   ]);
 
   // Save Invoice & Show Actions
@@ -636,10 +881,22 @@ function NewInvoiceContent() {
     const invToSave: Invoice = {
       ...liveInvoice,
       id: `inv_${Date.now()}`,
+      billType,
+      sourceRawBillIds: sourceRawBillIds.length > 0 ? sourceRawBillIds : undefined,
     };
 
     BillingStore.saveInvoice(invToSave);
-    toast.success(`Invoice ${invToSave.invoiceNo} saved to database!`);
+
+    if (sourceRawBillIds.length > 0) {
+      BillingStore.markRawBillsConverted(sourceRawBillIds, invToSave.id);
+      toast.success(
+        `Official GST Invoice ${invToSave.invoiceNo} converted from ${sourceRawBillIds.length} Raw Bills!`
+      );
+    } else {
+      toast.success(
+        `${billType === "raw" ? "Raw Bill" : "GST Invoice"} ${invToSave.invoiceNo} saved to database!`
+      );
+    }
     router.push(`/invoices/${invToSave.id}`);
   };
 
@@ -710,7 +967,7 @@ function NewInvoiceContent() {
             onClick={handleDownloadPDF}
             disabled={isDownloading}
             variant="outline"
-            className="h-10 px-4 rounded-md border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/50 font-medium text-xs flex items-center gap-1.5 shadow-2xs"
+            className="h-10 px-3.5 rounded-md border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/50 font-medium text-xs flex items-center gap-1.5 shadow-2xs"
           >
             {isDownloading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -723,10 +980,28 @@ function NewInvoiceContent() {
           <Button
             onClick={() => handlePrintLive("Original")}
             variant="outline"
-            className="h-10 px-4 rounded-md font-medium text-xs flex items-center gap-1.5 shadow-2xs"
+            className="h-10 px-3.5 rounded-md font-medium text-xs flex items-center gap-1.5 shadow-2xs"
           >
             <Printer className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
             <span>Print Invoice</span>
+          </Button>
+
+          <Button
+            onClick={() => handlePrintLive("Duplicate")}
+            variant="outline"
+            className="h-10 px-3.5 rounded-md font-medium text-xs flex items-center gap-1.5 shadow-2xs"
+          >
+            <Printer className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+            <span>Duplicate</span>
+          </Button>
+
+          <Button
+            onClick={handleWhatsAppLive}
+            className="h-10 px-3.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-2xs"
+            title="Share on WhatsApp"
+          >
+            <Share2 className="h-4 w-4" />
+            <span>Share</span>
           </Button>
 
           <Button
@@ -982,15 +1257,85 @@ function NewInvoiceContent() {
                   </span>
                   <span>Invoice Metadata</span>
                 </div>
-                <Badge
-                  variant={isInterstate ? "destructive" : "secondary"}
-                  className="font-medium text-[10px] rounded-md"
-                >
-                  {!isInterstate ? "CGST + SGST (5%) Intra" : "IGST (5%) Inter"}
-                </Badge>
+                {billType === "raw" ? (
+                  <Badge className="font-semibold text-[10px] rounded-md bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 border border-amber-300">
+                    RAW BILL (NO GST)
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant={isInterstate ? "destructive" : "secondary"}
+                    className="font-medium text-[10px] rounded-md"
+                  >
+                    {!isInterstate ? "CGST + SGST (5%) Intra" : "IGST (5%) Inter"}
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-3 text-xs">
+              {/* Bill Type Selector: Tax Invoice vs Raw Bill */}
+              <div className="flex items-center gap-2 p-1 bg-zinc-100 dark:bg-[#181922] rounded-lg border border-[#ececee] dark:border-[#2d2f39] w-fit">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBillType("gst");
+                    setItems((prev) =>
+                      prev.map((it) => ({
+                        ...it,
+                        gstRate: it.gstRate === 0 ? 5 : it.gstRate,
+                      }))
+                    );
+                    const lastGst = invoices.find((i) => i.billType !== "raw")?.invoiceNo || "MTJ/144";
+                    setInvoiceNo(
+                      generateNextInvoiceNumber(
+                        lastGst,
+                        settings.invoicePrefix || "MTJ",
+                        settings.financialYear || "2026-27"
+                      )
+                    );
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    billType === "gst"
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Tax Invoice (GST)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBillType("raw");
+                    setItems((prev) =>
+                      prev.map((it) => {
+                        const qNum = Number(it.quantity) || 0;
+                        const faNum = Number(it.finalAmount) || 0;
+                        const rNum =
+                          faNum > 0 && qNum > 0
+                            ? (faNum / qNum).toFixed(2)
+                            : it.rate
+                            ? String(it.rate)
+                            : "";
+                        return {
+                          ...it,
+                          gstRate: 0,
+                          rate: rNum,
+                          pricePerPiece: rNum,
+                        };
+                      })
+                    );
+                    const rawCount = invoices.filter((i) => i.billType === "raw").length;
+                    setInvoiceNo(`RAW/${rawCount + 101}`);
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    billType === "raw"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Raw Bill (No GST)
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs font-medium text-muted-foreground">
@@ -1014,7 +1359,7 @@ function NewInvoiceContent() {
                 </div>
               </div>
 
-              {/* Toggle E-Invoice / Transport */}
+              {/* Toggle Transport Fields */}
               <div>
                 <button
                   type="button"
@@ -1022,8 +1367,7 @@ function NewInvoiceContent() {
                   className="flex items-center justify-between w-full text-[11px] text-purple-600 dark:text-purple-400 font-semibold hover:underline pt-1"
                 >
                   <span>
-                    {showTransportFields ? "Hide" : "Show"} E-Invoice & Vehicle
-                    Fields
+                    {showTransportFields ? "Hide" : "Show"} E-Way Bill & Transport Fields
                   </span>
                   {showTransportFields ? (
                     <ChevronUp className="h-3 w-3" />
@@ -1034,37 +1378,6 @@ function NewInvoiceContent() {
 
                 {showTransportFields && (
                   <div className="space-y-2 pt-2 border-t border-[#ececee] dark:border-[#2d2f39] mt-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-[10px]">ACK No</Label>
-                        <Input
-                          placeholder="ACK No"
-                          value={ackNo}
-                          onChange={(e) => setAckNo(e.target.value)}
-                          className="h-7 text-[10px] font-mono mt-0.5 rounded-md"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-[10px]">ACK Date</Label>
-                        <Input
-                          placeholder="DD/MM/YYYY HH:MM"
-                          value={ackDate}
-                          onChange={(e) => setAckDate(e.target.value)}
-                          className="h-7 text-[10px] mt-0.5 rounded-md"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-[10px]">IRN (64-character hash)</Label>
-                      <Input
-                        placeholder="IRN Hash"
-                        value={irn}
-                        onChange={(e) => setIrn(e.target.value)}
-                        className="h-7 text-[10px] font-mono mt-0.5 rounded-md"
-                      />
-                    </div>
-
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <Label className="text-[10px]">Eway Bill No</Label>
@@ -1222,252 +1535,513 @@ function NewInvoiceContent() {
             </CardHeader>
 
             <CardContent className="p-0">
-              <div className="overflow-visible">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-zinc-50 dark:bg-[#181922] border-b border-[#ececee] dark:border-[#2d2f39] text-muted-foreground font-medium text-[10.5px]">
-                      <th className="p-2.5 w-8 text-center font-normal">#</th>
-                      <th className="p-2.5 min-w-[190px] font-normal">Product Name</th>
-                      <th className="p-2.5 w-16 text-center font-normal">HSN</th>
-                      <th className="p-2.5 w-24 text-right font-normal">Qty (KG)</th>
-                      <th className="p-2.5 w-28 text-right font-normal">Rate (₹)</th>
-                      <th className="p-2.5 w-16 text-center font-normal">GST</th>
-                      <th className="p-2.5 w-24 text-right font-normal">Taxable</th>
-                      <th className="p-2.5 w-8"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#ececee] dark:divide-[#2d2f39]">
-                    {items.map((row, index) => {
-                      const qty = Number(row.quantity) || 0;
-                      const rt = Number(row.rate) || 0;
-                      const calc = calculateItemRow(
-                        qty,
-                        rt,
-                        row.gstRate,
-                        isInterstate
-                      );
+              <div className="divide-y divide-[#ececee] dark:divide-[#2d2f39]">
+                {items.map((row, index) => {
+                  const qty = Number(row.quantity) || 0;
+                  const rt = Number(row.rate) || 0;
+                  const effectiveGst = billType === "raw" ? 0 : row.gstRate;
+                  const calc = calculateItemRow(
+                    qty,
+                    rt,
+                    effectiveGst,
+                    isInterstate
+                  );
+                  const totalGstFromFinal =
+                    row.finalAmount && Number(row.finalAmount) > 0 && effectiveGst > 0
+                      ? Math.round(
+                          (Number(row.finalAmount) * (effectiveGst / (100 + effectiveGst))) * 100
+                        ) / 100
+                      : null;
+                  const rowTaxable =
+                    totalGstFromFinal !== null
+                      ? Math.round((Number(row.finalAmount) - totalGstFromFinal) * 100) / 100
+                      : calc.taxableAmount;
+                  const rowCgst =
+                    totalGstFromFinal !== null
+                      ? !isInterstate
+                        ? Math.round((totalGstFromFinal / 2) * 100) / 100
+                        : 0
+                      : calc.cgstAmount;
+                  const rowSgst =
+                    totalGstFromFinal !== null
+                      ? !isInterstate
+                        ? Math.round((totalGstFromFinal - rowCgst) * 100) / 100
+                        : 0
+                      : calc.sgstAmount;
+                  const rowIgst =
+                    totalGstFromFinal !== null
+                      ? isInterstate
+                        ? totalGstFromFinal
+                        : 0
+                      : calc.igstAmount;
 
-                      const filteredRowProducts = products.filter((p) => {
-                        if (!row.productName) return true;
-                        const q = row.productName.toLowerCase().trim();
-                        return (
-                          p.name.toLowerCase().includes(q) ||
-                          p.hsn.toLowerCase().includes(q) ||
-                          (p.category && p.category.toLowerCase().includes(q))
-                        );
-                      });
+                  const filteredRowProducts = products.filter((p) => {
+                    if (!row.productName) return true;
+                    const q = row.productName.toLowerCase().trim();
+                    return (
+                      p.name.toLowerCase().includes(q) ||
+                      p.hsn.toLowerCase().includes(q) ||
+                      (p.category && p.category.toLowerCase().includes(q))
+                    );
+                  });
 
-                      return (
-                        <tr
-                          key={row.id}
-                          className={`hover:bg-zinc-50/50 dark:hover:bg-[#121016] ${activeProductDropdown === index ? "relative z-40" : "relative z-0"
-                            }`}
+                  return (
+                    <div
+                      key={row.id}
+                      className={`p-3.5 hover:bg-zinc-50/60 dark:hover:bg-[#121016] transition-colors space-y-2.5 ${
+                        activeProductDropdown === index ? "relative z-40" : "relative z-0"
+                      }`}
+                    >
+                      {/* Row 1: Product Combobox (Wide), HSN, and Delete */}
+                      <div className="flex items-center gap-2.5">
+                        <span className="h-8 w-8 rounded-md bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-mono font-bold text-xs flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
+
+                        {/* Product Combobox - Takes maximum available width */}
+                        <div
+                          ref={(el) => {
+                            productDropdownRefs.current[index] = el;
+                          }}
+                          className="flex-1 relative"
                         >
-                          <td className="p-2 text-center font-normal text-muted-foreground">
-                            {index + 1}
-                          </td>
-
-                          {/* Product Writable Combobox with Suggestions */}
-                          <td className="p-2">
-                            <div
-                              ref={(el) => {
-                                productDropdownRefs.current[index] = el;
+                          <div className="relative">
+                            <Input
+                              placeholder="TYPE OR SELECT PRODUCT..."
+                              value={row.productName}
+                              onFocus={() => setActiveProductDropdown(index)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setItems((prev) => {
+                                  const u = [...prev];
+                                  u[index] = {
+                                    ...u[index],
+                                    productName: val,
+                                    productId: "",
+                                  };
+                                  return u;
+                                });
+                                setActiveProductDropdown(index);
                               }}
-                              className="relative"
-                            >
-                              <div className="relative">
-                                <Input
-                                  placeholder="Type or select product..."
-                                  value={row.productName}
-                                  onFocus={() => setActiveProductDropdown(index)}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setItems((prev) => {
-                                      const u = [...prev];
-                                      u[index] = {
-                                        ...u[index],
-                                        productName: val,
-                                        productId: "",
-                                      };
-                                      return u;
-                                    });
-                                    setActiveProductDropdown(index);
-                                  }}
-                                  className="h-8 text-xs font-normal uppercase bg-white dark:bg-[#181922] pr-6 rounded-md"
-                                />
-                                <ChevronDown className="absolute right-2 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none opacity-60" />
-                              </div>
+                              className="h-9 text-xs font-semibold uppercase bg-white dark:bg-[#181922] pr-7 rounded-md border-[#ececee] dark:border-[#2d2f39]"
+                            />
+                            <ChevronDown className="absolute right-2.5 top-3 h-3.5 w-3.5 text-muted-foreground pointer-events-none opacity-60" />
+                          </div>
 
-                              {/* Suggestion Dropdown */}
-                              {activeProductDropdown === index && (
-                                <div className="absolute left-0 top-full mt-1 w-[320px] bg-white dark:bg-[#181922] border border-[#ececee] dark:border-[#2d2f39] rounded-md shadow-2xl z-50 max-h-56 overflow-y-auto">
-                                  {filteredRowProducts.length > 0 ? (
-                                    filteredRowProducts.map((p) => (
-                                      <div
-                                        key={p.id}
-                                        onClick={() => {
-                                          handleSelectProduct(index, p.id);
-                                          setActiveProductDropdown(null);
-                                        }}
-                                        className="p-2 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer border-b border-[#ececee]/60 dark:border-[#2d2f39]/60 last:border-none transition-colors"
-                                      >
-                                        <div className="flex justify-between items-center">
-                                          <span className="font-medium text-xs text-foreground uppercase">
-                                            {p.name}
-                                          </span>
-                                          <span className="font-mono text-[10.5px] text-purple-600 dark:text-purple-400 font-normal">
-                                            ₹{p.defaultRate}/{p.unit || "KG"}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                                          <span>HSN: {p.hsn}</span>
-                                          <span>GST: {p.gstRate}%</span>
-                                          <span>{p.category}</span>
-                                        </div>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="p-2.5 text-center text-xs text-muted-foreground">
-                                      No catalog product matches &ldquo;{row.productName}&rdquo;
-                                    </div>
-                                  )}
-
-                                  {/* Quick Add Product to Master Catalog */}
+                          {/* Suggestion Dropdown */}
+                          {activeProductDropdown === index && (
+                            <div className="absolute left-0 top-full mt-1 w-full max-w-[420px] bg-white dark:bg-[#181922] border border-[#ececee] dark:border-[#2d2f39] rounded-md shadow-2xl z-50 max-h-56 overflow-y-auto">
+                              {filteredRowProducts.length > 0 ? (
+                                filteredRowProducts.map((p) => (
                                   <div
+                                    key={p.id}
                                     onClick={() => {
-                                      setTargetProductRowIndex(index);
-                                      setNewProductName(row.productName || "");
-                                      setIsAddProductOpen(true);
+                                      handleSelectProduct(index, p.id);
                                       setActiveProductDropdown(null);
                                     }}
-                                    className="p-2 text-xs text-purple-600 dark:text-purple-400 font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer flex items-center gap-1.5 border-t border-[#ececee] dark:border-[#2d2f39]"
+                                    className="p-2 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer border-b border-[#ececee]/60 dark:border-[#2d2f39]/60 last:border-none transition-colors"
                                   >
-                                    <Plus className="h-3.5 w-3.5" />
-                                    <span>
-                                      {row.productName
-                                        ? `Add "${row.productName}" to Master Catalog`
-                                        : "Add New Product to Master Catalog"}
-                                    </span>
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-medium text-xs text-foreground uppercase">
+                                        {p.name}
+                                      </span>
+                                      <span className="font-mono text-[10.5px] text-purple-600 dark:text-purple-400 font-normal">
+                                        ₹{p.defaultRate}/{p.unit || "KG"}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
+                                      <span>HSN: {p.hsn}</span>
+                                      <span>GST: {p.gstRate}%</span>
+                                      <span>{p.category}</span>
+                                    </div>
                                   </div>
+                                ))
+                              ) : (
+                                <div className="p-2.5 text-center text-xs text-muted-foreground">
+                                  No catalog product matches &ldquo;{row.productName}&rdquo;
                                 </div>
                               )}
+
+                              {/* Quick Add Product to Master Catalog */}
+                              <div
+                                onClick={() => {
+                                  setTargetProductRowIndex(index);
+                                  setNewProductName(row.productName || "");
+                                  setIsAddProductOpen(true);
+                                  setActiveProductDropdown(null);
+                                }}
+                                className="p-2 text-xs text-purple-600 dark:text-purple-400 font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer flex items-center gap-1.5 border-t border-[#ececee] dark:border-[#2d2f39]"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                <span>
+                                  {row.productName
+                                    ? `Add "${row.productName}" to Master Catalog`
+                                    : "Add New Product to Master Catalog"}
+                                </span>
+                              </div>
                             </div>
-                          </td>
+                          )}
+                        </div>
 
-                          {/* HSN */}
-                          <td className="p-2">
-                            <Input
-                              value={row.hsn}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setItems((prev) => {
-                                  const u = [...prev];
-                                  u[index] = { ...u[index], hsn: val };
-                                  return u;
-                                });
-                              }}
-                              className="h-8 font-mono font-normal text-center text-xs px-1 rounded-md"
-                            />
-                          </td>
+                        {/* HSN Code (Spacious & Clear) */}
+                        <div className="w-28 shrink-0">
+                          <Input
+                            placeholder="HSN"
+                            value={row.hsn}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setItems((prev) => {
+                                const u = [...prev];
+                                u[index] = { ...u[index], hsn: val };
+                                return u;
+                              });
+                            }}
+                            className="h-9 font-mono font-bold text-center text-xs px-2 rounded-md border-[#ececee] dark:border-[#2d2f39]"
+                          />
+                        </div>
 
-                          {/* Qty (Light weight font) */}
-                          <td className="p-2">
-                            <Input
-                              type="number"
-                              step="0.001"
-                              placeholder="0.000"
-                              value={row.quantity}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setItems((prev) => {
-                                  const u = [...prev];
-                                  u[index] = { ...u[index], quantity: val };
-                                  return u;
-                                });
-                              }}
-                              className="h-8 font-mono font-normal text-xs text-right px-1 rounded-md"
-                            />
-                          </td>
+                        {/* Remove Row Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(index)}
+                          className="h-9 w-9 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer shrink-0 border border-transparent hover:border-red-200"
+                          title="Remove row"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
 
-                          {/* Rate */}
-                          <td className="p-2">
-                            <div className="space-y-0.5">
+                      {/* Row 2: Large & Spacious Financial & Quantity Inputs */}
+                      <div className="flex items-center gap-2.5 pl-10 flex-wrap sm:flex-nowrap">
+                        {/* Quantity (Never truncated, plenty of width) */}
+                        <div className="flex-1 min-w-[125px]">
+                          <div className="text-[10px] font-semibold text-muted-foreground mb-1">
+                            Qty ({billType === "raw" ? "Unit" : "KG"})
+                          </div>
+                          <Input
+                            type="number"
+                            step="0.001"
+                            placeholder="0.000"
+                            value={row.quantity}
+                            onChange={(e) => {
+                              const qVal = e.target.value;
+                              setItems((prev) => {
+                                const u = [...prev];
+                                const item = { ...u[index], quantity: qVal };
+                                const qNum = Number(qVal) || 0;
+                                const isRaw = billType === "raw";
+                                const gst = isRaw ? 0 : (item.gstRate || 0);
+                                const pppNum = Number(item.pricePerPiece) || 0;
+                                const faNum = Number(item.finalAmount) || 0;
+                                const rNum = Number(item.rate) || 0;
+
+                                const isFromTotal =
+                                  item.lastEditedField === "finalAmount" ||
+                                  (faNum > 0 && !item.pricePerPiece && !item.rate);
+
+                                if (qNum > 0) {
+                                  if (isFromTotal && faNum > 0) {
+                                    item.lastEditedField = "finalAmount";
+                                    if (isRaw) {
+                                      const r = (faNum / qNum).toFixed(2);
+                                      item.rate = r;
+                                      item.pricePerPiece = r;
+                                    } else {
+                                      item.pricePerPiece = (faNum / qNum).toFixed(2);
+                                      const baseTax = faNum / (1 + gst / 100);
+                                      item.rate = (baseTax / qNum).toFixed(4);
+                                    }
+                                  } else {
+                                    if (isRaw) {
+                                      const unitRate = pppNum > 0 ? pppNum : rNum;
+                                      if (unitRate > 0) {
+                                        item.rate = unitRate.toFixed(2);
+                                        item.pricePerPiece = unitRate.toFixed(2);
+                                        item.finalAmount = (qNum * unitRate).toFixed(2);
+                                      } else if (faNum > 0) {
+                                        const r = (faNum / qNum).toFixed(2);
+                                        item.rate = r;
+                                        item.pricePerPiece = r;
+                                        item.lastEditedField = "finalAmount";
+                                      }
+                                    } else {
+                                      if (pppNum > 0) {
+                                        const total = qNum * pppNum;
+                                        item.finalAmount = total.toFixed(2);
+                                        const baseTax = total / (1 + gst / 100);
+                                        item.rate = (baseTax / qNum).toFixed(4);
+                                      } else if (rNum > 0) {
+                                        const ppp = rNum * (1 + gst / 100);
+                                        item.pricePerPiece = ppp.toFixed(2);
+                                        item.finalAmount = (qNum * ppp).toFixed(2);
+                                      } else if (faNum > 0) {
+                                        item.pricePerPiece = (faNum / qNum).toFixed(2);
+                                        const baseTax = faNum / (1 + gst / 100);
+                                        item.rate = (baseTax / qNum).toFixed(4);
+                                        item.lastEditedField = "finalAmount";
+                                      }
+                                    }
+                                  }
+                                } else {
+                                  if (isFromTotal) {
+                                    item.pricePerPiece = "";
+                                    item.rate = "";
+                                  } else {
+                                    item.finalAmount = "";
+                                  }
+                                }
+                                u[index] = item;
+                                return u;
+                              });
+                            }}
+                            className="h-9 font-mono font-bold text-sm text-right px-2.5 rounded-md border-[#ececee] dark:border-[#2d2f39]"
+                          />
+                        </div>
+
+                        {/* Price Per Piece (GST) / Unit Rate (Raw) */}
+                        <div className="flex-1 min-w-[130px]">
+                          <div className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 mb-1">
+                            {billType === "raw" ? "Rate (₹)" : "Price/Pc (Incl. GST)"}
+                          </div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={billType === "raw" ? "Rate" : "0.00"}
+                            value={billType === "raw" ? (row.rate ?? row.pricePerPiece ?? "") : (row.pricePerPiece ?? "")}
+                            onChange={(e) => {
+                              const pppVal = e.target.value;
+                              setItems((prev) => {
+                                const u = [...prev];
+                                const item = {
+                                  ...u[index],
+                                  lastEditedField: "pricePerPiece" as const,
+                                };
+                                const pppNum = Number(pppVal) || 0;
+                                const qNum = Number(item.quantity) || 0;
+                                const isRaw = billType === "raw";
+                                const gst = isRaw ? 0 : (item.gstRate || 0);
+
+                                if (isRaw) {
+                                  item.rate = pppVal;
+                                  item.pricePerPiece = pppVal;
+                                  if (pppNum > 0 && qNum > 0) {
+                                    item.finalAmount = (qNum * pppNum).toFixed(2);
+                                  } else if (pppVal === "") {
+                                    item.finalAmount = "";
+                                  }
+                                } else {
+                                  item.pricePerPiece = pppVal;
+                                  if (pppNum > 0) {
+                                    item.rate = (pppNum / (1 + gst / 100)).toFixed(4);
+                                    if (qNum > 0) {
+                                      item.finalAmount = (qNum * pppNum).toFixed(2);
+                                    }
+                                  } else if (pppVal === "") {
+                                    item.rate = "";
+                                    item.finalAmount = "";
+                                  }
+                                }
+                                u[index] = item;
+                                return u;
+                              });
+                            }}
+                            className="h-9 font-mono font-bold text-sm text-right px-2.5 rounded-md border-purple-300 dark:border-purple-700 text-purple-950 dark:text-purple-100 bg-purple-50/40 dark:bg-purple-950/30"
+                          />
+                        </div>
+
+                        {/* Total Amount Input */}
+                        <div className="flex-1 min-w-[140px]">
+                          <div className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 mb-1">
+                            {billType === "raw" ? "Total (₹)" : "Total Amt (Incl. GST)"}
+                          </div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={billType === "raw" ? "Total" : "Incl. GST"}
+                            value={row.finalAmount ?? ""}
+                            onChange={(e) => {
+                              const faVal = e.target.value;
+                              setItems((prev) => {
+                                const u = [...prev];
+                                const item = {
+                                  ...u[index],
+                                  finalAmount: faVal,
+                                  lastEditedField: "finalAmount" as const,
+                                };
+                                const faNum = Number(faVal) || 0;
+                                const qNum = Number(item.quantity) || 0;
+                                const isRaw = billType === "raw";
+                                const gst = isRaw ? 0 : (item.gstRate || 0);
+
+                                if (faNum > 0) {
+                                  if (isRaw) {
+                                    if (qNum > 0) {
+                                      const r = (faNum / qNum).toFixed(2);
+                                      item.rate = r;
+                                      item.pricePerPiece = r;
+                                    } else {
+                                      item.rate = "";
+                                      item.pricePerPiece = "";
+                                    }
+                                  } else {
+                                    if (qNum > 0) {
+                                      item.pricePerPiece = (faNum / qNum).toFixed(2);
+                                      const baseTax = faNum / (1 + gst / 100);
+                                      item.rate = (baseTax / qNum).toFixed(4);
+                                    } else {
+                                      item.pricePerPiece = "";
+                                      item.rate = "";
+                                    }
+                                  }
+                                } else if (faVal === "") {
+                                  item.pricePerPiece = "";
+                                  item.rate = "";
+                                }
+                                u[index] = item;
+                                return u;
+                              });
+                            }}
+                            className="h-9 font-mono font-black text-sm text-right px-2.5 rounded-md border-purple-400 dark:border-purple-600 text-purple-950 dark:text-purple-50 bg-purple-100/50 dark:bg-purple-900/30"
+                          />
+                        </div>
+
+                        {/* GST Specific Inputs: Base Rate & GST % */}
+                        {billType !== "raw" && (
+                          <>
+                            <div className="w-28 shrink-0">
+                              <div className="text-[10px] font-semibold text-muted-foreground mb-1 flex items-center justify-between">
+                                <span>Base Rate</span>
+                                {row.suggestedRate && (
+                                  <span className="text-[9px] text-purple-600 font-mono">
+                                    {row.suggestedRate.toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
                               <Input
                                 type="number"
                                 step="0.0001"
                                 placeholder="0.00"
                                 value={row.rate}
                                 onChange={(e) => {
-                                  const val = e.target.value;
+                                  const rVal = e.target.value;
                                   setItems((prev) => {
                                     const u = [...prev];
-                                    u[index] = { ...u[index], rate: val };
+                                    const item = {
+                                      ...u[index],
+                                      rate: rVal,
+                                      lastEditedField: "rate" as const,
+                                    };
+                                    const rNum = Number(rVal) || 0;
+                                    const qNum = Number(item.quantity) || 0;
+                                    const gst = item.gstRate || 0;
+
+                                    if (rNum > 0) {
+                                      const ppp = rNum * (1 + gst / 100);
+                                      item.pricePerPiece = ppp.toFixed(2);
+                                      if (qNum > 0) {
+                                        item.finalAmount = (qNum * ppp).toFixed(2);
+                                      }
+                                    } else if (rVal === "") {
+                                      item.pricePerPiece = "";
+                                      item.finalAmount = "";
+                                    }
+                                    u[index] = item;
                                     return u;
                                   });
                                 }}
-                                className="h-8 font-mono font-normal text-xs text-right px-1 rounded-md"
+                                className="h-9 font-mono text-xs text-right px-2 rounded-md border-[#ececee] dark:border-[#2d2f39]"
                               />
-                              {row.suggestedRate && (
-                                <div
-                                  onClick={() => {
-                                    setItems((prev) => {
-                                      const u = [...prev];
-                                      u[index] = {
-                                        ...u[index],
-                                        rate: row.suggestedRate!,
-                                      };
-                                      return u;
-                                    });
-                                  }}
-                                  className="text-[9px] text-purple-600 dark:text-purple-400 font-normal cursor-pointer hover:underline truncate"
-                                >
-                                  Last: ₹{row.suggestedRate}
-                                </div>
-                              )}
                             </div>
-                          </td>
 
-                          {/* GST % (Light weight font) */}
-                          <td className="p-2">
-                            <select
-                              value={row.gstRate}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setItems((prev) => {
-                                  const u = [...prev];
-                                  u[index] = { ...u[index], gstRate: val };
-                                  return u;
-                                });
-                              }}
-                              className="h-8 w-full text-xs font-normal rounded-md border border-[#ececee] dark:border-[#2d2f39] bg-white dark:bg-[#181922] px-0.5 text-center font-mono"
-                            >
-                              <option value="5">5%</option>
-                              <option value="12">12%</option>
-                              <option value="18">18%</option>
-                              <option value="0">0%</option>
-                            </select>
-                          </td>
+                            <div className="w-20 shrink-0">
+                              <div className="text-[10px] font-semibold text-muted-foreground mb-1">
+                                GST %
+                              </div>
+                              <select
+                                value={row.gstRate}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setItems((prev) => {
+                                    const u = [...prev];
+                                    const item = { ...u[index], gstRate: val };
+                                    const faNum = Number(item.finalAmount) || 0;
+                                    const pppNum = Number(item.pricePerPiece) || 0;
+                                    const rNum = Number(item.rate) || 0;
+                                    const qNum = Number(item.quantity) || 0;
 
-                          {/* Taxable (Light weight font) */}
-                          <td className="p-2 text-right font-mono font-normal text-foreground">
-                            {formatNumber(calc.taxableAmount, 2)}
-                          </td>
+                                    if (item.lastEditedField === "finalAmount" && faNum > 0) {
+                                      const baseTax = faNum / (1 + val / 100);
+                                      if (qNum > 0) {
+                                        item.pricePerPiece = (faNum / qNum).toFixed(2);
+                                        item.rate = (baseTax / qNum).toFixed(4);
+                                      }
+                                    } else if (pppNum > 0) {
+                                      item.rate = (pppNum / (1 + val / 100)).toFixed(4);
+                                      if (qNum > 0) {
+                                        item.finalAmount = (qNum * pppNum).toFixed(2);
+                                      }
+                                    } else if (rNum > 0) {
+                                      const ppp = rNum * (1 + val / 100);
+                                      item.pricePerPiece = ppp.toFixed(2);
+                                      if (qNum > 0) {
+                                        item.finalAmount = (qNum * ppp).toFixed(2);
+                                      }
+                                    }
+                                    u[index] = item;
+                                    return u;
+                                  });
+                                }}
+                                className="h-9 w-full rounded-md border border-[#ececee] dark:border-[#2d2f39] bg-white dark:bg-[#181922] px-1 text-xs font-mono font-semibold"
+                              >
+                                <option value="5">5%</option>
+                                <option value="12">12%</option>
+                                <option value="18">18%</option>
+                                <option value="0">0%</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
+                      </div>
 
-                          {/* Remove */}
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(index)}
-                              className="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-red-600"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      {/* Row 3 (GST Mode Only): Live Tax Breakdown */}
+                      {billType !== "raw" && (
+                        <div className="flex items-center justify-between pl-10 pt-1 text-[11px] font-mono text-muted-foreground border-t border-dotted border-border">
+                          <span>
+                            Taxable:{" "}
+                            <strong className="text-foreground font-semibold">
+                              {formatINR(rowTaxable)}
+                            </strong>
+                          </span>
+                          <div className="flex items-center gap-3">
+                            {!isInterstate ? (
+                              <>
+                                <span>
+                                  CGST:{" "}
+                                  <strong className="text-foreground font-medium">
+                                    {formatINR(rowCgst)}
+                                  </strong>
+                                </span>
+                                <span>
+                                  SGST:{" "}
+                                  <strong className="text-foreground font-medium">
+                                    {formatINR(rowSgst)}
+                                  </strong>
+                                </span>
+                              </>
+                            ) : (
+                              <span>
+                                IGST:{" "}
+                                <strong className="text-foreground font-medium">
+                                  {formatINR(rowIgst)}
+                                </strong>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -1485,7 +2059,7 @@ function NewInvoiceContent() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground font-medium">
-                  Subtotal (Taxable):
+                  {billType === "raw" ? "Subtotal:" : "Subtotal (Taxable):"}
                 </span>
                 <span className="font-mono font-semibold text-foreground">
                   {formatINR(summary.totalTaxable)}
@@ -1520,18 +2094,20 @@ function NewInvoiceContent() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground font-medium">
-                  {!isInterstate ? "CGST + SGST (5%)" : "IGST (5%)"}:
-                </span>
-                <span className="font-mono font-medium">
-                  {formatINR(
-                    !isInterstate
-                      ? summary.totalCgst + summary.totalSgst
-                      : summary.totalIgst
-                  )}
-                </span>
-              </div>
+              {billType !== "raw" && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground font-medium">
+                    {!isInterstate ? "Total CGST + SGST" : "Total IGST"}:
+                  </span>
+                  <span className="font-mono font-medium">
+                    {formatINR(
+                      !isInterstate
+                        ? summary.totalCgst + summary.totalSgst
+                        : summary.totalIgst
+                    )}
+                  </span>
+                </div>
+              )}
 
               {summary.roundOff !== 0 && (
                 <div className="flex justify-between items-center text-[11px] text-muted-foreground">
@@ -1634,74 +2210,30 @@ function NewInvoiceContent() {
                   </select>
                 </div>
 
-                {/* Copy type */}
-                <div className="flex rounded-md bg-zinc-100 dark:bg-zinc-800 p-0.5 text-[11px] font-medium">
-                  {(["Original", "Duplicate", "Triplicate"] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setPreviewCopyType(type)}
-                      className={`px-2 py-0.5 rounded transition-all ${previewCopyType === type
-                        ? "bg-purple-600 text-white shadow-2xs font-semibold"
-                        : "text-zinc-600 dark:text-zinc-400 hover:text-foreground"
-                        }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                {/* Copy type dropdown */}
+                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-[11px] font-medium border border-zinc-200 dark:border-zinc-700">
+                  <select
+                    value={previewCopyType}
+                    onChange={(e) =>
+                      setPreviewCopyType(
+                        e.target.value as "Original" | "Duplicate" | "Triplicate"
+                      )
+                    }
+                    className="bg-transparent text-[11px] font-semibold text-zinc-900 dark:text-zinc-100 outline-none cursor-pointer pr-1"
+                  >
+                    <option value="Original" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                      Original
+                    </option>
+                    <option value="Duplicate" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                      Duplicate
+                    </option>
+                    <option value="Triplicate" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                      Triplicate
+                    </option>
+                  </select>
                 </div>
               </div>
             </CardHeader>
-
-            {/* Quick action bar */}
-            <div className="px-2.5 py-1.5 bg-zinc-50 dark:bg-[#14121a] border-b border-[#ececee] dark:border-[#2d2f39] flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <Button
-                  onClick={handleDownloadPDF}
-                  disabled={isDownloading}
-                  className="h-7 px-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-md flex items-center gap-1 shadow-2xs"
-                >
-                  {isDownloading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Download className="h-3.5 w-3.5" />
-                  )}
-                  <span>Download PDF</span>
-                </Button>
-                <Button
-                  onClick={() => handlePrintLive("Original")}
-                  className="h-7 px-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-zinc-900 font-medium text-xs rounded-md flex items-center gap-1 shadow-2xs"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  <span>Print Original</span>
-                </Button>
-                <Button
-                  onClick={() => handlePrintLive("Duplicate")}
-                  variant="outline"
-                  className="h-7 px-2 text-xs font-medium rounded-md flex items-center gap-1"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  <span>Duplicate</span>
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Button
-                  onClick={handleWhatsAppLive}
-                  className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-md flex items-center gap-1 shadow-2xs"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  <span>WhatsApp</span>
-                </Button>
-                <Button
-                  onClick={handleSaveInvoice}
-                  className="h-7 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium text-xs rounded-md flex items-center gap-1 shadow-sm"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  <span>Save Bill</span>
-                </Button>
-              </div>
-            </div>
 
             {/* Fixed Non-Scrollable Rendered Live Template Sheet */}
             <CardContent className="p-3 bg-zinc-100 dark:bg-zinc-950/80 overflow-hidden flex justify-center items-start min-h-[640px]">

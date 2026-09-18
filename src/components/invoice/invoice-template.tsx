@@ -1,6 +1,7 @@
 "use client";
 
 import React, { forwardRef, useState, useRef, useEffect } from "react";
+import QRCode from "qrcode";
 import {
   Invoice,
   BusinessSettings,
@@ -177,15 +178,15 @@ function ElementFormatBar({
     alignment === "left"
       ? "left-0 translate-x-0 items-start"
       : alignment === "right"
-      ? "right-0 translate-x-0 items-end"
-      : "left-1/2 -translate-x-1/2 items-center";
+        ? "right-0 translate-x-0 items-end"
+        : "left-1/2 -translate-x-1/2 items-center";
 
   const arrowAlignClasses =
     alignment === "left"
       ? "ml-4"
       : alignment === "right"
-      ? "mr-4"
-      : "";
+        ? "mr-4"
+        : "";
 
   return (
     <div
@@ -263,11 +264,10 @@ function ElementFormatBar({
             onUpdateStyle({ fontWeight: isBold ? "normal" : "bold" })
           }
           title="Toggle Bold"
-          className={`h-7 min-w-[26px] px-2 py-1 rounded-md text-xs font-black cursor-pointer transition-colors flex items-center justify-center ${
-            isBold
+          className={`h-7 min-w-[26px] px-2 py-1 rounded-md text-xs font-black cursor-pointer transition-colors flex items-center justify-center ${isBold
               ? "bg-purple-600 text-white shadow-sm"
               : "hover:bg-zinc-800 text-zinc-300"
-          }`}
+            }`}
         >
           B
         </button>
@@ -279,11 +279,10 @@ function ElementFormatBar({
             onUpdateStyle({ fontStyle: isItalic ? "normal" : "italic" })
           }
           title="Toggle Italic"
-          className={`h-7 min-w-[26px] px-2 py-1 rounded-md text-xs italic font-serif cursor-pointer transition-colors flex items-center justify-center ${
-            isItalic
+          className={`h-7 min-w-[26px] px-2 py-1 rounded-md text-xs italic font-serif cursor-pointer transition-colors flex items-center justify-center ${isItalic
               ? "bg-purple-600 text-white shadow-sm"
               : "hover:bg-zinc-800 text-zinc-300"
-          }`}
+            }`}
         >
           I
         </button>
@@ -297,11 +296,10 @@ function ElementFormatBar({
             })
           }
           title="Toggle Underline"
-          className={`h-7 min-w-[26px] px-2 py-1 rounded-md text-xs underline font-semibold cursor-pointer transition-colors flex items-center justify-center ${
-            isUnderline
+          className={`h-7 min-w-[26px] px-2 py-1 rounded-md text-xs underline font-semibold cursor-pointer transition-colors flex items-center justify-center ${isUnderline
               ? "bg-purple-600 text-white shadow-sm"
               : "hover:bg-zinc-800 text-zinc-300"
-          }`}
+            }`}
         >
           U
         </button>
@@ -315,11 +313,10 @@ function ElementFormatBar({
             })
           }
           title="Toggle Uppercase"
-          className={`h-7 min-w-[26px] px-1.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors flex items-center justify-center ${
-            isUppercase
+          className={`h-7 min-w-[26px] px-1.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors flex items-center justify-center ${isUppercase
               ? "bg-purple-600 text-white shadow-sm"
               : "hover:bg-zinc-800 text-zinc-300"
-          }`}
+            }`}
         >
           TT
         </button>
@@ -332,11 +329,10 @@ function ElementFormatBar({
               type="button"
               onClick={() => onUpdateStyle({ color: c })}
               title={c}
-              className={`h-4 w-4 rounded-full border border-white/20 transition-transform cursor-pointer ${
-                currentStyle?.color === c
+              className={`h-4 w-4 rounded-full border border-white/20 transition-transform cursor-pointer ${currentStyle?.color === c
                   ? "scale-125 ring-2 ring-purple-400 ring-offset-1 ring-offset-zinc-900"
                   : "hover:scale-115 opacity-80 hover:opacity-100"
-              }`}
+                }`}
               style={{ backgroundColor: c }}
             />
           ))}
@@ -455,8 +451,8 @@ function EditableText({
       custom?.textTransform !== undefined
         ? (custom.textTransform as any)
         : uppercase
-        ? "uppercase"
-        : style?.textTransform,
+          ? "uppercase"
+          : style?.textTransform,
     color: custom?.color !== undefined ? custom.color : style?.color,
     letterSpacing:
       custom?.letterSpacing !== undefined
@@ -527,13 +523,11 @@ function EditableText({
         onFocus={handleFocus}
         onMouseDown={(e) => e.stopPropagation()}
         title={tooltip || "Click to edit text and customize style"}
-        className={`outline-none transition-all rounded-xs cursor-text inline-block min-w-[20px] ${
-          isSelected
+        className={`outline-none transition-all rounded-xs cursor-text inline-block min-w-[20px] ${isSelected
             ? "ring-2 ring-purple-600 bg-purple-100/70 dark:bg-purple-900/60 shadow-xs z-10"
             : "focus:ring-2 focus:ring-purple-600 focus:bg-purple-50 dark:focus:bg-purple-950/80 hover:ring-1 hover:ring-purple-400 hover:bg-purple-50/40"
-        } ${
-          uppercase || custom?.textTransform === "uppercase" ? "uppercase" : ""
-        } ${className}`}
+          } ${uppercase || custom?.textTransform === "uppercase" ? "uppercase" : ""
+          } ${className}`}
         style={effectiveStyle}
       >
         {value || placeholder}
@@ -631,16 +625,44 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       Boolean(invoice.customerStateCode) &&
       Boolean(settings.stateCode) &&
       invoice.customerStateCode !== settings.stateCode;
+    const isRaw = invoice.billType === "raw";
 
     // Supplier details from reactive settings
     const companyTitle = settings.companyName || "SHREE MANGALAM THREAD & JARI";
     const companyAddress =
       settings.address || "SHOP NO.1,JAY NARAYAN IND.-1,ANJANA FARM,SURAT.";
     const companyGstin = settings.gstin || "24AEYPV3370E1Z1";
+    const companyPan =
+      settings.pan && settings.pan.trim().length > 0
+        ? settings.pan.trim()
+        : companyGstin && companyGstin.length === 15
+          ? companyGstin.substring(2, 12)
+          : "";
     const companyMobile1 = settings.phone || "97235 44545";
-    const companyMobile2 = settings.phoneAlt || "98248 55454";
+    const companyMobile2 = settings.phoneAlt ? settings.phoneAlt.trim() : "";
     const devotionalHeader =
       settings.devotionalHeader || "ll SHREE GANESHAY NAMAH ll";
+
+    // Dynamic Heading Bill Link QR & Payment QR
+    const [headingQrUrl, setHeadingQrUrl] = useState<string>("");
+    const [bankUpiQrUrl, setBankUpiQrUrl] = useState<string>("");
+
+    useEffect(() => {
+      // 1. Heading QR: Scannable link directly opening the bill PDF/view
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const billUrl = `${origin}/invoices/${invoice.id}`;
+      QRCode.toDataURL(billUrl, { margin: 1, width: 260, errorCorrectionLevel: "M" })
+        .then(setHeadingQrUrl)
+        .catch(() => { });
+
+      // 2. Bank Details QR: Payment via UPI if UPI ID exists
+      if (settings.upiId && settings.upiId.trim().length > 0) {
+        const upiString = `upi://pay?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(companyTitle)}&am=${invoice.grandTotal || 0}&cu=INR&tn=Bill%20${encodeURIComponent(invoice.invoiceNo || "")}`;
+        QRCode.toDataURL(upiString, { margin: 1, width: 320, errorCorrectionLevel: "M" })
+          .then(setBankUpiQrUrl)
+          .catch(() => { });
+      }
+    }, [invoice.id, invoice.invoiceNo, invoice.grandTotal, settings.upiId, companyTitle]);
 
     // Logo configuration
     const logoType = settings.logoType || "monogram";
@@ -672,18 +694,18 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       (template.fontSize === "compact"
         ? 8.5
         : template.fontSize === "large"
-        ? 11
-        : 9.5);
+          ? 11
+          : 9.5);
 
     // Border styling
     const containerBorderClass =
       template.borderStyle === "double-border"
         ? "border-4 border-double"
         : template.borderStyle === "minimal-border"
-        ? "border"
-        : template.borderStyle === "borderless-modern"
-        ? "border border-zinc-300 shadow-sm"
-        : "border-2";
+          ? "border"
+          : template.borderStyle === "borderless-modern"
+            ? "border border-zinc-300 shadow-sm"
+            : "border-2";
 
     const borderColor = template.themeColor || "#000000";
 
@@ -695,8 +717,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       template.tableDensity === "compact"
         ? 22
         : template.tableDensity === "spacious"
-        ? 14
-        : 18;
+          ? 14
+          : 18;
     const emptyRowsCount = Math.max(0, minRows - (invoice.items?.length || 0));
 
     // Custom fields grouped by placement
@@ -785,15 +807,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             sectionRefs.current[sectionId] = el;
           }}
           style={customHeight ? { minHeight: `${customHeight}px` } : undefined}
-          className={`relative flex flex-col justify-center transition-all group/sec ${
-            interactive
+          className={`relative flex flex-col justify-center transition-all group/sec ${interactive
               ? "hover:ring-1 hover:ring-purple-400 hover:bg-purple-50/5"
               : ""
-          } ${
-            isHovered && interactive
+            } ${isHovered && interactive
               ? "ring-2 ring-purple-600 bg-purple-50/15"
               : ""
-          }`}
+            }`}
         >
           {/* Inner Section Content (Stretches full height and centers automatically) */}
           <div className="w-full h-full flex flex-col justify-center flex-1">
@@ -942,7 +962,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 }
               )}
             </div>
-            {companyMobile2 && (
+            {companyMobile2 && companyMobile2.length > 0 && (
               <div className="mt-0.5">
                 {renderET(
                   "company_phones",
@@ -969,8 +989,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         logoSize === "small"
           ? "w-16 h-14"
           : logoSize === "large"
-          ? "w-24 h-22"
-          : "w-20 h-18";
+            ? "w-24 h-22"
+            : "w-20 h-18";
 
       return renderSectionWrapper(
         "brand_header",
@@ -983,11 +1003,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           <div className="relative shrink-0 flex items-center justify-start">
             <div
               onClick={() => interactive && setActivePopover("logo")}
-              className={`relative ${
-                interactive
+              className={`relative ${interactive
                   ? "cursor-pointer group/logo rounded p-0.5 hover:ring-2 hover:ring-purple-500 transition-all"
                   : ""
-              }`}
+                }`}
             >
               {logoType === "image" && logoUrl ? (
                 <div
@@ -1081,11 +1100,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     onClick={() =>
                       onUpdateSettings?.({ logoType: "monogram" })
                     }
-                    className={`py-1 rounded cursor-pointer ${
-                      logoType === "monogram"
+                    className={`py-1 rounded cursor-pointer ${logoType === "monogram"
                         ? "bg-background text-foreground shadow-xs"
                         : "text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     Monogram
                   </button>
@@ -1093,11 +1111,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     onClick={() =>
                       onUpdateSettings?.({ logoType: "image" })
                     }
-                    className={`py-1 rounded cursor-pointer ${
-                      logoType === "image"
+                    className={`py-1 rounded cursor-pointer ${logoType === "image"
                         ? "bg-background text-foreground shadow-xs"
                         : "text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     Image
                   </button>
@@ -1105,11 +1122,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     onClick={() =>
                       onUpdateSettings?.({ logoType: "none" })
                     }
-                    className={`py-1 rounded cursor-pointer ${
-                      logoType === "none"
+                    className={`py-1 rounded cursor-pointer ${logoType === "none"
                         ? "bg-background text-foreground shadow-xs"
                         : "text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     None
                   </button>
@@ -1154,9 +1170,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 {/* Image Upload Options */}
                 {logoType === "image" && (
                   <div className="space-y-2 pt-1">
+                    {logoUrl && (
+                      <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded border flex items-center justify-center">
+                        <img src={logoUrl} alt="Logo Preview" className="max-h-12 object-contain" />
+                      </div>
+                    )}
                     <label className="block w-full text-center py-2 px-3 border-2 border-dashed border-purple-400 hover:border-purple-600 rounded bg-purple-50/40 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold text-[11px] cursor-pointer">
                       <Upload className="h-3.5 w-3.5 mx-auto mb-0.5" />
-                      <span>Upload Logo File (PNG/JPG)</span>
+                      <span>{logoUrl ? "Replace Logo Image" : "Upload Logo File (PNG/JPG)"}</span>
                       <input
                         ref={logoInputRef}
                         type="file"
@@ -1176,11 +1197,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                           <button
                             key={s}
                             onClick={() => onUpdateSettings?.({ logoSize: s })}
-                            className={`px-1.5 py-0.5 rounded capitalize font-bold cursor-pointer ${
-                              logoSize === s
+                            className={`px-1.5 py-0.5 rounded capitalize font-bold cursor-pointer ${logoSize === s
                                 ? "bg-purple-600 text-white"
                                 : "bg-muted text-muted-foreground"
-                            }`}
+                              }`}
                           >
                             {s}
                           </button>
@@ -1238,69 +1258,66 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 }
               )}
             </p>
-            <div className="text-[1.05em] font-bold tracking-tight mt-0.5">
-              GSTIN No.{" "}
-              <span className="font-mono font-black">
-                {renderET(
-                  "company_gstin",
-                  "Company GSTIN",
-                  companyGstin,
-                  (val) => onUpdateSettings?.({ gstin: val }),
-                  {
-                    defaultFontSizePx: 10.5,
-                    uppercase: true,
-                    tooltip: "Click to edit Company GSTIN",
-                  }
-                )}
-              </span>
-            </div>
-          </div>
-
-          {/* Right: Dynamic QR Code */}
-          <div className="relative shrink-0 flex justify-end">
-            {showQrCode ? (
-              <div
-                onClick={() => interactive && setActivePopover("qr")}
-                className={`relative w-14 h-14 border p-0.5 bg-white flex flex-col items-center justify-center ${
-                  interactive
-                    ? "cursor-pointer group/qr hover:ring-2 hover:ring-purple-500 rounded"
-                    : ""
-                }`}
-                style={{ borderColor }}
-              >
-                {qrCodeType === "custom" && qrCodeUrl ? (
-                  <img
-                    src={qrCodeUrl}
-                    alt="QR Code"
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="w-full h-full"
-                    shapeRendering="crispEdges"
-                  >
-                    <path
-                      d="M0 0h30v30H0zm40 0h10v10H40zm20 0h10v10H60zm10 0h30v30H70zM10 10h10v10H10zm70 0h10v10H80zM0 40h10v10H0zm20 0h20v10H20zm30 0h20v20H50zm30 0h20v10H80zM0 70h30v30H0zm40 10h10v20H40zm20-10h10v10H60zm20 0h20v30H80zm-70 10h10v10H10zm40 10h20v10H50z"
-                      fill={borderColor}
-                    />
-                  </svg>
-                )}
-
-                {interactive && (
-                  <div className="absolute inset-0 bg-purple-900/70 opacity-0 group-hover/qr:opacity-100 flex items-center justify-center rounded text-white text-[7.5px] font-bold uppercase tracking-wider text-center p-0.5">
-                    Change QR
+            {!isRaw && (
+              <div className="text-[1.05em] font-bold tracking-tight mt-0.5 flex items-center justify-center gap-4 flex-wrap">
+                <div>
+                  GSTIN No.{" "}
+                  <span className="font-mono font-black">
+                    {renderET(
+                      "company_gstin",
+                      "Company GSTIN",
+                      companyGstin,
+                      (val) => onUpdateSettings?.({ gstin: val }),
+                      {
+                        defaultFontSizePx: 10.5,
+                        uppercase: true,
+                        tooltip: "Click to edit Company GSTIN",
+                      }
+                    )}
+                  </span>
+                </div>
+                {companyPan && companyPan.length > 0 && (
+                  <div>
+                    PAN No.{" "}
+                    <span className="font-mono font-black">
+                      {renderET(
+                        "company_pan",
+                        "Company PAN",
+                        companyPan,
+                        (val) => onUpdateSettings?.({ pan: val }),
+                        {
+                          defaultFontSizePx: 10.5,
+                          uppercase: true,
+                          tooltip: "Click to edit Company PAN",
+                        }
+                      )}
+                    </span>
                   </div>
                 )}
               </div>
-            ) : interactive ? (
-              <button
-                onClick={() => onUpdateTemplate?.({ showQrCode: true })}
-                className="w-14 h-14 border border-dashed border-zinc-300 rounded flex flex-col items-center justify-center text-[7px] text-zinc-400 hover:text-purple-600 hover:border-purple-400 cursor-pointer"
+            )}
+          </div>
+
+          {/* Right: Dynamic Bill QR Code (scannable to open bill PDF/view) */}
+          <div className="relative shrink-0 flex items-center justify-end">
+            {showQrCode ? (
+              <div
+                title="Scan with camera to open bill PDF/view"
+                className="flex flex-col items-center justify-center p-0 bg-transparent"
               >
-                <QrCode className="h-4 w-4 mb-0.5" />
-                <span>Add QR</span>
-              </button>
+                {headingQrUrl ? (
+                  <img
+                    src={headingQrUrl}
+                    alt="Invoice Link QR"
+                    className="w-16 h-16 object-contain"
+                  />
+                ) : (
+                  <div className="w-16 h-16 flex items-center justify-center text-[8px] font-bold">QR</div>
+                )}
+                <span className="text-[6.5px] font-bold text-center leading-none text-zinc-500 uppercase mt-0.5 tracking-tight">
+                  Scan for Bill
+                </span>
+              </div>
             ) : null}
 
             {/* In-Preview QR Customizer Popover */}
@@ -1336,6 +1353,16 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     className="w-full h-7 px-2 border rounded text-xs font-mono bg-background"
                   />
                 </div>
+
+                {(settings.qrCodeUrl || headingQrUrl) && (
+                  <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded border flex items-center justify-center">
+                    <img
+                      src={settings.qrCodeUrl || headingQrUrl}
+                      alt="QR Preview"
+                      className="w-16 h-16 object-contain rounded"
+                    />
+                  </div>
+                )}
 
                 <label className="block w-full text-center py-2 px-3 border-2 border-dashed border-purple-400 hover:border-purple-600 rounded bg-purple-50/40 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold text-[11px] cursor-pointer">
                   <Upload className="h-3.5 w-3.5 mx-auto mb-0.5" />
@@ -1392,7 +1419,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             {renderET(
               "invoice_title",
               "Invoice Title Banner",
-              "Tax Invoice",
+              invoice.billType === "raw" ? "RAW BILL / DELIVERY CHALLAN" : "Tax Invoice",
               undefined,
               {
                 defaultFontSizePx: 12.5,
@@ -1534,54 +1561,56 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               ))}
             </div>
 
-            <div className="pt-1 border-t border-dotted border-black/50 mt-1">
-              <div className="flex justify-between items-center text-[1.1em] font-bold">
-                <div>
-                  GSTINO :{" "}
-                  <span className="font-mono font-black text-[1.15em]">
-                    {renderET(
-                      "receiver_gstin",
-                      "Customer GSTIN",
-                      invoice.customerGstin || "24AGQPT2491L1ZO",
-                      undefined,
-                      {
-                        defaultFontSizePx: 11.5,
-                        uppercase: true,
-                        tooltip: "Customer GSTIN (Sample)",
-                      }
-                    )}
-                  </span>
-                </div>
-                <div>
-                  State :{" "}
-                  <span className="font-mono font-bold">
-                    {renderET(
-                      "receiver_gstin",
-                      "State Code",
-                      invoice.customerStateCode || "24",
-                      undefined,
-                      {
-                        defaultFontSizePx: 11.0,
-                        tooltip: "State Code (Sample)",
-                      }
-                    )}
-                  </span>{" "}
-                  <span className="uppercase">
-                    {renderET(
-                      "receiver_gstin",
-                      "State Name",
-                      invoice.customerState || "GUJARAT",
-                      undefined,
-                      {
-                        defaultFontSizePx: 11.0,
-                        uppercase: true,
-                        tooltip: "State Name (Sample)",
-                      }
-                    )}
-                  </span>
+            {!isRaw && (
+              <div className="pt-1 border-t border-dotted border-black/50 mt-1">
+                <div className="flex justify-between items-center text-[1.1em] font-bold">
+                  <div>
+                    GSTINO :{" "}
+                    <span className="font-mono font-black text-[1.15em]">
+                      {renderET(
+                        "receiver_gstin",
+                        "Customer GSTIN",
+                        invoice.customerGstin || "24AGQPT2491L1ZO",
+                        undefined,
+                        {
+                          defaultFontSizePx: 11.5,
+                          uppercase: true,
+                          tooltip: "Customer GSTIN (Sample)",
+                        }
+                      )}
+                    </span>
+                  </div>
+                  <div>
+                    State :{" "}
+                    <span className="font-mono font-bold">
+                      {renderET(
+                        "receiver_gstin",
+                        "State Code",
+                        invoice.customerStateCode || "24",
+                        undefined,
+                        {
+                          defaultFontSizePx: 11.0,
+                          tooltip: "State Code (Sample)",
+                        }
+                      )}
+                    </span>{" "}
+                    <span className="uppercase">
+                      {renderET(
+                        "receiver_gstin",
+                        "State Name",
+                        invoice.customerState || "GUJARAT",
+                        undefined,
+                        {
+                          defaultFontSizePx: 11.0,
+                          uppercase: true,
+                          tooltip: "State Name (Sample)",
+                        }
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Right: Bill Metadata Box */}
@@ -1613,11 +1642,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               </span>
             </div>
             <div
-              className={`grid grid-cols-12 py-1 px-2 items-center ${
-                template.showAckIrn || template.showVehicleTransport || headerRightFields.length > 0
+              className={`grid grid-cols-12 py-1 px-2 items-center ${template.showVehicleTransport || headerRightFields.length > 0
                   ? "border-b"
                   : ""
-              }`}
+                }`}
               style={{ borderColor }}
             >
               <span className="col-span-4 font-bold text-[1.05em]">Date :</span>
@@ -1635,88 +1663,32 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               </span>
             </div>
 
-            {template.showAckIrn && (
-              <>
-                <div
-                  className="grid grid-cols-12 border-b py-1 px-2 items-center text-[1em]"
-                  style={{ borderColor }}
-                >
-                  <span className="col-span-4 font-bold">ACK No :</span>
-                  <span className="col-span-8 text-right font-mono font-black text-[1.1em]">
-                    {renderET(
-                      "ack_irn",
-                      "ACK Number",
-                      invoice.ackNo || "162625465338519",
-                      undefined,
-                      {
-                        defaultFontSizePx: 11.0,
-                        tooltip: "ACK Number",
-                      }
-                    )}
-                  </span>
-                </div>
-                <div
-                  className="grid grid-cols-12 border-b py-1 px-2 items-center text-[1em]"
-                  style={{ borderColor }}
-                >
-                  <span className="col-span-4 font-bold">Date :</span>
-                  <span className="col-span-8 text-right font-bold text-[1.05em]">
-                    {renderET(
-                      "ack_irn",
-                      "ACK Date",
-                      invoice.ackDate || "02/08/2026 11:17:00 AM",
-                      undefined,
-                      {
-                        defaultFontSizePx: 10.5,
-                        tooltip: "ACK Date",
-                      }
-                    )}
-                  </span>
-                </div>
-                <div
-                  className="grid grid-cols-12 border-b py-1 px-2 items-center text-[0.95em] leading-tight"
-                  style={{ borderColor }}
-                >
-                  <span className="col-span-3 font-bold">IRN :</span>
-                  <span className="col-span-9 text-right font-mono font-bold text-[0.95em] break-all">
-                    {renderET(
-                      "ack_irn",
-                      "IRN Hash",
-                      invoice.irn ||
-                        "124530801ecefda7fd4e0972ffe7a9a50d8f8f30e60086b9fe88e8e6828bb9ec",
-                      undefined,
-                      {
-                        defaultFontSizePx: 9.5,
-                        tooltip: "IRN Hash",
-                      }
-                    )}
-                  </span>
-                </div>
-              </>
-            )}
+
 
             {template.showVehicleTransport && (
               <>
-                <div
-                  className="grid grid-cols-12 border-b py-1 px-2 items-center text-[1em]"
-                  style={{ borderColor }}
-                >
-                  <span className="col-span-4 font-bold">
-                    Eway Bill No :
-                  </span>
-                  <span className="col-span-8 text-right font-mono font-bold text-[1.1em]">
-                    {renderET(
-                      "transport_meta",
-                      "Eway Bill No",
-                      invoice.ewayBillNo || "-",
-                      undefined,
-                      {
-                        defaultFontSizePx: 11.0,
-                        tooltip: "Eway Bill No",
-                      }
-                    )}
-                  </span>
-                </div>
+                {!isRaw && (
+                  <div
+                    className="grid grid-cols-12 border-b py-1 px-2 items-center text-[1em]"
+                    style={{ borderColor }}
+                  >
+                    <span className="col-span-4 font-bold">
+                      Eway Bill No :
+                    </span>
+                    <span className="col-span-8 text-right font-mono font-bold text-[1.1em]">
+                      {renderET(
+                        "transport_meta",
+                        "Eway Bill No",
+                        invoice.ewayBillNo || "-",
+                        undefined,
+                        {
+                          defaultFontSizePx: 11.0,
+                          tooltip: "Eway Bill No",
+                        }
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div
                   className="grid grid-cols-12 border-b py-1 px-2 items-center text-[1em]"
                   style={{ borderColor }}
@@ -1886,69 +1858,111 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   color: isHeaderAccent ? "#ffffff" : "#000000",
                 }}
               >
-                <th
-                  className="border-r py-1 px-1 w-[4%]"
-                  style={{ borderColor }}
-                >
-                  Sr.
-                </th>
-                <th
-                  className="border-r py-1 px-1 text-left w-[28%]"
-                  style={{ borderColor }}
-                >
-                  Product Name
-                </th>
-                <th
-                  className="border-r py-1 px-1 w-[10%]"
-                  style={{ borderColor }}
-                >
-                  HSN
-                </th>
-                <th
-                  className="border-r py-1 px-1 w-[11%]"
-                  style={{ borderColor }}
-                >
-                  Nt.Wt. <br />
-                  Pcs/Box
-                </th>
-                <th
-                  className="border-r py-1 px-1 w-[11%]"
-                  style={{ borderColor }}
-                >
-                  Rate
-                </th>
-                <th
-                  className="border-r py-1 px-1 w-[14%]"
-                  style={{ borderColor }}
-                >
-                  Taxable <br />
-                  Amount
-                </th>
-                <th
-                  className="border-r py-1 px-1 w-[6%]"
-                  style={{ borderColor }}
-                >
-                  GST %
-                </th>
-                {!isInterstate ? (
+                {isRaw ? (
                   <>
                     <th
-                      className="border-r py-1 px-1 w-[8%]"
+                      className="border-r py-1 px-1 w-[5%]"
                       style={{ borderColor }}
                     >
-                      CGST <br />
-                      Amt.
+                      Sr.
                     </th>
-                    <th className="py-1 px-1 w-[8%]">
-                      SGST <br />
-                      Amt.
+                    <th
+                      className="border-r py-1 px-1 text-left w-[45%]"
+                      style={{ borderColor }}
+                    >
+                      Product Name
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[12%]"
+                      style={{ borderColor }}
+                    >
+                      HSN
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[12%]"
+                      style={{ borderColor }}
+                    >
+                      Qty
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[12%]"
+                      style={{ borderColor }}
+                    >
+                      Rate
+                    </th>
+                    <th
+                      className="py-1 px-1 w-[14%]"
+                      style={{ borderColor }}
+                    >
+                      Total
                     </th>
                   </>
                 ) : (
-                  <th className="py-1 px-1 w-[16%]">
-                    IGST <br />
-                    Amt.
-                  </th>
+                  <>
+                    <th
+                      className="border-r py-1 px-1 w-[4%]"
+                      style={{ borderColor }}
+                    >
+                      Sr.
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 text-left w-[28%]"
+                      style={{ borderColor }}
+                    >
+                      Product Name
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[10%]"
+                      style={{ borderColor }}
+                    >
+                      HSN
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[11%]"
+                      style={{ borderColor }}
+                    >
+                      Qty.
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[11%]"
+                      style={{ borderColor }}
+                    >
+                      Rate
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[14%]"
+                      style={{ borderColor }}
+                    >
+                      Taxable <br />
+                      Amount
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 w-[6%]"
+                      style={{ borderColor }}
+                    >
+                      GST %
+                    </th>
+                    {!isInterstate ? (
+                      <>
+                        <th
+                          className="border-r py-1 px-1 w-[8%]"
+                          style={{ borderColor }}
+                        >
+                          CGST <br />
+                          Amt.
+                        </th>
+                        <th className="py-1 px-1 w-[8%]">
+                          SGST <br />
+                          Amt.
+                        </th>
+                      </>
+                    ) : (
+                      <th className="py-1 px-1 w-[16%]">
+                        IGST <br />
+                        Amt.
+                      </th>
+                    )}
+                  </>
                 )}
               </tr>
             </thead>
@@ -1956,87 +1970,151 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               {(invoice.items || []).map((item, index) => (
                 <tr
                   key={item.id || index}
-                  className={`font-semibold text-[1.05em] ${
-                    template.tableDensity === "compact" ? "h-5" : "h-6"
-                  }`}
+                  className={`font-semibold text-[1.05em] ${template.tableDensity === "compact" ? "h-5" : "h-6"
+                    }`}
                 >
-                  <td
-                    className="border-r py-0.5 px-1 text-center font-bold"
-                    style={{ borderColor }}
-                  >
-                    {index + 1}
-                  </td>
-                  <td
-                    className="border-r py-0.5 px-1 font-black uppercase text-[1.08em] truncate"
-                    style={{ borderColor }}
-                  >
-                    {renderET(
-                      "items_table_body",
-                      "Product Name",
-                      item.productName,
-                      undefined,
-                      {
-                        defaultFontSizePx: 10.5,
-                        uppercase: true,
-                        tooltip: "Product Name (Sample)",
-                      }
-                    )}
-                  </td>
-                  <td
-                    className="border-r py-0.5 px-1 text-center font-mono font-bold text-[1.05em]"
-                    style={{ borderColor }}
-                  >
-                    {renderET(
-                      "items_table_body",
-                      "HSN Code",
-                      item.hsn,
-                      undefined,
-                      {
-                        defaultFontSizePx: 10.0,
-                        tooltip: "HSN Code (Sample)",
-                      }
-                    )}
-                  </td>
-                  <td
-                    className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
-                    style={{ borderColor }}
-                  >
-                    {formatNumber(item.quantity, 3)}
-                  </td>
-                  <td
-                    className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
-                    style={{ borderColor }}
-                  >
-                    {formatNumber(item.rate, 4)}
-                  </td>
-                  <td
-                    className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
-                    style={{ borderColor }}
-                  >
-                    {formatNumber(item.taxableAmount, 2)}
-                  </td>
-                  <td
-                    className="border-r py-0.5 px-1 text-center font-mono font-bold text-[1.05em]"
-                    style={{ borderColor }}
-                  >
-                    {item.gstRate.toFixed(3)}
-                  </td>
-                  {!isInterstate ? (
+                  {isRaw ? (
                     <>
                       <td
-                        className="border-r py-0.5 px-1 text-right font-mono font-bold text-[1.05em]"
+                        className="border-r py-0.5 px-1 text-center font-bold"
                         style={{ borderColor }}
                       >
-                        {formatNumber(item.cgstAmount, 2)}
+                        {index + 1}
                       </td>
-                      <td className="py-0.5 px-1 text-right font-mono font-bold text-[1.05em]">
-                        {formatNumber(item.sgstAmount, 2)}
+                      <td
+                        className="border-r py-0.5 px-1 font-black uppercase text-[1.08em] truncate"
+                        style={{ borderColor }}
+                      >
+                        {renderET(
+                          "items_table_body",
+                          "Product Name",
+                          item.productName,
+                          undefined,
+                          {
+                            defaultFontSizePx: 10.5,
+                            uppercase: true,
+                            tooltip: "Product Name (Sample)",
+                          }
+                        )}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-center font-mono font-bold text-[1.05em]"
+                        style={{ borderColor }}
+                      >
+                        {renderET(
+                          "items_table_body",
+                          "HSN Code",
+                          item.hsn,
+                          undefined,
+                          {
+                            defaultFontSizePx: 10.0,
+                            tooltip: "HSN Code (Sample)",
+                          }
+                        )}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
+                        style={{ borderColor }}
+                      >
+                        {formatNumber(item.quantity, 3)}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
+                        style={{ borderColor }}
+                      >
+                        {formatNumber(item.rate, 2)}
+                      </td>
+                      <td
+                        className="py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
+                        style={{ borderColor }}
+                      >
+                        {formatNumber(
+                          item.netAmount || (Number(item.quantity) * Number(item.rate)),
+                          2
+                        )}
                       </td>
                     </>
                   ) : (
-                    <td className="py-0.5 px-1 text-right font-mono font-bold text-[1.05em]">
-                      {formatNumber(item.igstAmount, 2)}
-                    </td>
+                    <>
+                      <td
+                        className="border-r py-0.5 px-1 text-center font-bold"
+                        style={{ borderColor }}
+                      >
+                        {index + 1}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 font-black uppercase text-[1.08em] truncate"
+                        style={{ borderColor }}
+                      >
+                        {renderET(
+                          "items_table_body",
+                          "Product Name",
+                          item.productName,
+                          undefined,
+                          {
+                            defaultFontSizePx: 10.5,
+                            uppercase: true,
+                            tooltip: "Product Name (Sample)",
+                          }
+                        )}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-center font-mono font-bold text-[1.05em]"
+                        style={{ borderColor }}
+                      >
+                        {renderET(
+                          "items_table_body",
+                          "HSN Code",
+                          item.hsn,
+                          undefined,
+                          {
+                            defaultFontSizePx: 10.0,
+                            tooltip: "HSN Code (Sample)",
+                          }
+                        )}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
+                        style={{ borderColor }}
+                      >
+                        {formatNumber(item.quantity, 3)}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
+                        style={{ borderColor }}
+                      >
+                        {formatNumber(item.rate, 4)}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
+                        style={{ borderColor }}
+                      >
+                        {formatNumber(item.taxableAmount, 2)}
+                      </td>
+                      <td
+                        className="border-r py-0.5 px-1 text-center font-mono font-bold text-[1.05em]"
+                        style={{ borderColor }}
+                      >
+                        {item.gstRate.toFixed(3)}
+                      </td>
+                      {!isInterstate ? (
+                        <>
+                          <td
+                            className="border-r py-0.5 px-1 text-right font-mono font-bold text-[1.05em]"
+                            style={{ borderColor }}
+                          >
+                            {formatNumber(item.cgstAmount, 2)}
+                          </td>
+                          <td className="py-0.5 px-1 text-right font-mono font-bold text-[1.05em]">
+                            {formatNumber(item.sgstAmount, 2)}
+                          </td>
+                        </>
+                      ) : (
+                        <td className="py-0.5 px-1 text-right font-mono font-bold text-[1.05em]">
+                          {formatNumber(item.igstAmount, 2)}
+                        </td>
+                      )}
+                    </>
                   )}
                 </tr>
               ))}
@@ -2049,20 +2127,33 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     template.tableDensity === "compact" ? "h-5" : "h-6"
                   }
                 >
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  {!isInterstate ? (
+                  {isRaw ? (
                     <>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
                       <td className="border-r" style={{ borderColor }}></td>
                       <td></td>
                     </>
                   ) : (
-                    <td></td>
+                    <>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      <td className="border-r" style={{ borderColor }}></td>
+                      {!isInterstate ? (
+                        <>
+                          <td className="border-r" style={{ borderColor }}></td>
+                          <td></td>
+                        </>
+                      ) : (
+                        <td></td>
+                      )}
+                    </>
                   )}
                 </tr>
               ))}
@@ -2072,58 +2163,97 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 className="border-t-2 border-b-2 font-black text-[1.05em] h-7"
                 style={{ borderColor }}
               >
-                <td
-                  colSpan={3}
-                  className="border-r py-0.5 px-1 text-center uppercase font-bold"
-                  style={{ borderColor }}
-                >
-                  {renderET(
-                    "items_table_totals",
-                    "Table Total Label",
-                    "Total",
-                    undefined,
-                    {
-                      defaultFontSizePx: 11.5,
-                      uppercase: true,
-                    }
-                  )}
-                </td>
-                <td
-                  className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
-                  style={{ borderColor }}
-                >
-                  {formatNumber(invoice.totalQuantity, 3)}
-                </td>
-                <td
-                  className="border-r py-0.5 px-1"
-                  style={{ borderColor }}
-                ></td>
-                <td
-                  className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.2em]"
-                  style={{ borderColor }}
-                >
-                  {formatNumber(invoice.totalTaxable, 2)}
-                </td>
-                <td
-                  className="border-r py-0.5 px-1"
-                  style={{ borderColor }}
-                ></td>
-                {!isInterstate ? (
+                {isRaw ? (
                   <>
                     <td
-                      className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
+                      colSpan={3}
+                      className="border-r py-0.5 px-1 text-center uppercase font-bold"
                       style={{ borderColor }}
                     >
-                      {formatNumber(invoice.totalCgst, 2)}
+                      {renderET(
+                        "items_table_totals",
+                        "Table Total Label",
+                        "Total",
+                        undefined,
+                        {
+                          defaultFontSizePx: 11.5,
+                          uppercase: true,
+                        }
+                      )}
                     </td>
-                    <td className="py-0.5 px-1 text-right font-mono font-black text-[1.1em]">
-                      {formatNumber(invoice.totalSgst, 2)}
+                    <td
+                      className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(invoice.totalQuantity, 3)}
+                    </td>
+                    <td
+                      className="border-r py-0.5 px-1"
+                      style={{ borderColor }}
+                    ></td>
+                    <td
+                      className="py-0.5 px-1 text-right font-mono font-black text-[1.2em]"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(invoice.grandTotal, 2)}
                     </td>
                   </>
                 ) : (
-                  <td className="py-0.5 px-1 text-right font-mono font-black text-[1.1em]">
-                    {formatNumber(invoice.totalIgst, 2)}
-                  </td>
+                  <>
+                    <td
+                      colSpan={3}
+                      className="border-r py-0.5 px-1 text-center uppercase font-bold"
+                      style={{ borderColor }}
+                    >
+                      {renderET(
+                        "items_table_totals",
+                        "Table Total Label",
+                        "Total",
+                        undefined,
+                        {
+                          defaultFontSizePx: 11.5,
+                          uppercase: true,
+                        }
+                      )}
+                    </td>
+                    <td
+                      className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(invoice.totalQuantity, 3)}
+                    </td>
+                    <td
+                      className="border-r py-0.5 px-1"
+                      style={{ borderColor }}
+                    ></td>
+                    <td
+                      className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.2em]"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(invoice.totalTaxable, 2)}
+                    </td>
+                    <td
+                      className="border-r py-0.5 px-1"
+                      style={{ borderColor }}
+                    ></td>
+                    {!isInterstate ? (
+                      <>
+                        <td
+                          className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(invoice.totalCgst, 2)}
+                        </td>
+                        <td className="py-0.5 px-1 text-right font-mono font-black text-[1.1em]">
+                          {formatNumber(invoice.totalSgst, 2)}
+                        </td>
+                      </>
+                    ) : (
+                      <td className="py-0.5 px-1 text-right font-mono font-black text-[1.1em]">
+                        {formatNumber(invoice.totalIgst, 2)}
+                      </td>
+                    )}
+                  </>
                 )}
               </tr>
             </tbody>
@@ -2169,75 +2299,104 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
             {template.showBankDetails && (
               <div
-                className="pt-1.5 border-t space-y-0.5 text-[0.95em]"
+                className="pt-2 border-t space-y-1 text-[1em]"
                 style={{ borderColor }}
               >
-                <div className="grid grid-cols-12">
-                  <span className="col-span-4 font-bold">Bank Name</span>
-                  <span className="col-span-8 font-black uppercase">
-                    :{" "}
-                    {renderET(
-                      "bank_details",
-                      "Bank Name",
-                      settings.bankName || "KOTAK BANK",
-                      (val) => onUpdateSettings?.({ bankName: val }),
-                      {
-                        defaultFontSizePx: 9.5,
-                        uppercase: true,
-                        tooltip: "Click to edit Bank Name",
-                      }
+                <div className="flex justify-between items-center gap-3">
+                  <div className="flex-1 space-y-1 text-[1.05em]">
+                    <div className="grid grid-cols-12 items-baseline">
+                      <span className="col-span-4 font-bold text-[1.1em]">Bank Name</span>
+                      <span className="col-span-8 font-black uppercase text-[1.15em]">
+                        :{" "}
+                        {renderET(
+                          "bank_details",
+                          "Bank Name",
+                          settings.bankName || "KOTAK BANK",
+                          (val) => onUpdateSettings?.({ bankName: val }),
+                          {
+                            defaultFontSizePx: 12.0,
+                            uppercase: true,
+                            tooltip: "Click to edit Bank Name",
+                          }
+                        )}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-12 items-baseline">
+                      <span className="col-span-4 font-bold text-[1.05em]">Branch Name</span>
+                      <span className="col-span-8 uppercase font-bold text-[1.1em]">
+                        :{" "}
+                        {renderET(
+                          "bank_details",
+                          "Branch Name",
+                          settings.branchName || "VRAJBHUMI APT.",
+                          (val) => onUpdateSettings?.({ branchName: val }),
+                          {
+                            defaultFontSizePx: 11.5,
+                            uppercase: true,
+                            tooltip: "Click to edit Branch Name",
+                          }
+                        )}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-12 items-baseline">
+                      <span className="col-span-4 font-bold text-[1.05em]">Bank A/c.No.</span>
+                      <span className="col-span-8 font-mono font-black text-[1.25em]">
+                        :{" "}
+                        {renderET(
+                          "bank_details",
+                          "Bank Account Number",
+                          settings.accountNumber || "9948291051",
+                          (val) => onUpdateSettings?.({ accountNumber: val }),
+                          {
+                            defaultFontSizePx: 12.5,
+                            tooltip: "Click to edit Bank Account Number",
+                          }
+                        )}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-12 items-baseline">
+                      <span className="col-span-4 font-bold text-[1.05em]">RTGS/IFSC Code</span>
+                      <span className="col-span-8 font-mono font-black text-[1.2em]">
+                        :{" "}
+                        {renderET(
+                          "bank_details",
+                          "Bank IFSC Code",
+                          settings.ifscCode || "KKBK0000883",
+                          (val) => onUpdateSettings?.({ ifscCode: val }),
+                          {
+                            defaultFontSizePx: 12.0,
+                            uppercase: true,
+                            tooltip: "Click to edit Bank IFSC Code",
+                          }
+                        )}
+                      </span>
+                    </div>
+                    {settings.upiId && settings.upiId.trim().length > 0 && (
+                      <div className="grid grid-cols-12 items-baseline pt-0.5">
+                        <span className="col-span-4 font-bold text-[1.05em]">UPI ID</span>
+                        <span className="col-span-8 font-mono font-black text-[1.15em] text-purple-900 dark:text-purple-300">
+                          : {settings.upiId}
+                        </span>
+                      </div>
                     )}
-                  </span>
-                </div>
-                <div className="grid grid-cols-12">
-                  <span className="col-span-4 font-bold">Branch Name</span>
-                  <span className="col-span-8 uppercase font-medium">
-                    :{" "}
-                    {renderET(
-                      "bank_details",
-                      "Branch Name",
-                      settings.branchName || "VRAJBHUMI APT.",
-                      (val) => onUpdateSettings?.({ branchName: val }),
-                      {
-                        defaultFontSizePx: 9.5,
-                        uppercase: true,
-                        tooltip: "Click to edit Branch Name",
-                      }
-                    )}
-                  </span>
-                </div>
-                <div className="grid grid-cols-12">
-                  <span className="col-span-4 font-bold">Bank A/c.No.</span>
-                  <span className="col-span-8 font-mono font-black text-[1.1em]">
-                    :{" "}
-                    {renderET(
-                      "bank_details",
-                      "Bank Account Number",
-                      settings.accountNumber || "9948291051",
-                      (val) => onUpdateSettings?.({ accountNumber: val }),
-                      {
-                        defaultFontSizePx: 10.5,
-                        tooltip: "Click to edit Bank Account Number",
-                      }
-                    )}
-                  </span>
-                </div>
-                <div className="grid grid-cols-12">
-                  <span className="col-span-4 font-bold">RTGS/IFSC Code</span>
-                  <span className="col-span-8 font-mono font-black text-[1.05em]">
-                    :{" "}
-                    {renderET(
-                      "bank_details",
-                      "Bank IFSC Code",
-                      settings.ifscCode || "KKBK0000883",
-                      (val) => onUpdateSettings?.({ ifscCode: val }),
-                      {
-                        defaultFontSizePx: 10.0,
-                        uppercase: true,
-                        tooltip: "Click to edit Bank IFSC Code",
-                      }
-                    )}
-                  </span>
+                  </div>
+
+                  {/* Payment QR Code in Bank Details Section */}
+                  {(settings.qrCodeUrl || bankUpiQrUrl) && (
+                    <div
+                      className="shrink-0 flex flex-col items-center justify-center p-1.5 border rounded bg-white shadow-xs self-center"
+                      style={{ borderColor }}
+                    >
+                      <img
+                        src={settings.qrCodeUrl || bankUpiQrUrl}
+                        alt="Payment QR"
+                        className="w-24 h-24 sm:w-26 sm:h-26 object-contain"
+                      />
+                      <span className="text-[8px] font-black uppercase tracking-wider text-muted-foreground mt-1">
+                        Scan To Pay
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2245,11 +2404,32 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
           {/* Right Column: Tax Breakdown & Grand Total */}
           <div className="col-span-5 p-2 flex flex-col justify-between text-[1.05em]">
-            {template.showTaxBreakdown && (
+            {isRaw ? (
               <div className="space-y-1">
                 {template.showDiscount &&
-                invoice.discount &&
-                invoice.discount > 0 ? (
+                  invoice.discount &&
+                  invoice.discount > 0 ? (
+                  <div className="flex justify-between font-bold text-red-700 print:text-black">
+                    <span>Less: Discount</span>
+                    <span className="font-mono font-bold text-[1.1em]">
+                      - {formatNumber(invoice.discount, 2)}
+                    </span>
+                  </div>
+                ) : null}
+                {invoice.roundOff !== 0 && (
+                  <div className="flex justify-between font-bold">
+                    <span>Round off</span>
+                    <span className="font-mono">
+                      {formatNumber(invoice.roundOff, 2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : template.showTaxBreakdown ? (
+              <div className="space-y-1">
+                {template.showDiscount &&
+                  invoice.discount &&
+                  invoice.discount > 0 ? (
                   <div className="flex justify-between font-bold text-red-700 print:text-black">
                     <span>Less: Discount</span>
                     <span className="font-mono font-bold text-[1.1em]">
@@ -2287,7 +2467,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </span>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Total Bill Amount Box */}
             <div
@@ -2339,9 +2519,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         settings.termsAndConditions && settings.termsAndConditions.length > 0
           ? settings.termsAndConditions
           : [
-              "1. Goods Once Sold Will Not Be Accepted.",
-              '2. "Subject to "SURAT" Jurisdiction. E.&O.E"',
-            ];
+            "1. Goods Once Sold Will Not Be Accepted.",
+            '2. "Subject to "SURAT" Jurisdiction. E.&O.E"',
+          ];
 
       return renderSectionWrapper(
         "terms_signatory",
@@ -2435,11 +2615,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
                 <div
                   onClick={() => interactive && setActivePopover("signature")}
-                  className={`py-0.5 flex items-center justify-center min-h-[34px] relative ${
-                    interactive
+                  className={`py-0.5 flex items-center justify-center min-h-[34px] relative ${interactive
                       ? "cursor-pointer group/sig rounded hover:ring-2 hover:ring-purple-500 transition-all"
                       : ""
-                  }`}
+                    }`}
                 >
                   {signatureType === "image" && signatureUrl ? (
                     <img
@@ -2515,11 +2694,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     onClick={() =>
                       onUpdateSettings?.({ signatureType: "font" })
                     }
-                    className={`py-1 rounded cursor-pointer ${
-                      signatureType === "font"
+                    className={`py-1 rounded cursor-pointer ${signatureType === "font"
                         ? "bg-background text-foreground shadow-xs"
                         : "text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     Digital Font
                   </button>
@@ -2527,11 +2705,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     onClick={() =>
                       onUpdateSettings?.({ signatureType: "image" })
                     }
-                    className={`py-1 rounded cursor-pointer ${
-                      signatureType === "image"
+                    className={`py-1 rounded cursor-pointer ${signatureType === "image"
                         ? "bg-background text-foreground shadow-xs"
                         : "text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     Upload Stamp
                   </button>
@@ -2584,9 +2761,18 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
                 {signatureType === "image" && (
                   <div className="space-y-2 pt-1">
+                    {signatureUrl && (
+                      <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded border flex items-center justify-center">
+                        <img
+                          src={signatureUrl}
+                          alt="Signature Preview"
+                          className="max-h-12 max-w-[140px] object-contain"
+                        />
+                      </div>
+                    )}
                     <label className="block w-full text-center py-2 px-3 border-2 border-dashed border-purple-400 hover:border-purple-600 rounded bg-purple-50/40 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold text-[11px] cursor-pointer">
                       <Upload className="h-3.5 w-3.5 mx-auto mb-0.5" />
-                      <span>Upload Signature / Stamp (PNG)</span>
+                      <span>{signatureUrl ? "Replace Signature / Stamp" : "Upload Signature / Stamp (PNG)"}</span>
                       <input
                         ref={sigInputRef}
                         type="file"
@@ -2659,7 +2845,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             {renderET(
               "custom_footer",
               "Footer Note 2",
-              "This is a computer generated tax invoice.",
+              invoice.billType === "raw"
+                ? "This is a computer generated bill."
+                : "This is a computer generated tax invoice.",
               undefined,
               {
                 defaultFontSizePx: 8.5,

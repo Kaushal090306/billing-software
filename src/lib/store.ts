@@ -55,6 +55,7 @@ export const INVOICE_ELEMENTS: InvoiceElementMeta[] = [
   { key: "company_name", label: "Company Legal Name", defaultFontSizePx: 16.5, section: "Header" },
   { key: "company_address", label: "Company Address", defaultFontSizePx: 9.0, section: "Header" },
   { key: "company_gstin", label: "Company GSTIN", defaultFontSizePx: 10.0, section: "Header" },
+  { key: "company_pan", label: "Company PAN", defaultFontSizePx: 10.0, section: "Header" },
   { key: "invoice_title", label: "Tax Invoice Banner Title", defaultFontSizePx: 12.0, section: "Title" },
   { key: "invoice_copy_type", label: "Copy Type Badge", defaultFontSizePx: 10.0, section: "Title" },
   { key: "receiver_title", label: "Receiver Box Title", defaultFontSizePx: 10.5, section: "Receiver" },
@@ -246,6 +247,7 @@ export interface InvoiceItem {
   quantity: number;
   unit: string;
   rate: number;
+  pricePerPiece?: number;
   taxableAmount: number;
   gstRate: number;
   cgstAmount: number;
@@ -292,6 +294,11 @@ export interface Invoice {
   dueDate?: string;
   notes?: string;
   createdAt: string;
+
+  // Raw Bill & GST Conversion fields
+  billType?: "gst" | "raw";
+  sourceRawBillIds?: string[];
+  convertedToInvoiceId?: string;
 }
 
 export interface PaymentRecord {
@@ -1013,6 +1020,92 @@ export const defaultInvoices: Invoice[] = [
     remainingAmount: 42450.0,
     createdAt: "2026-09-05T15:00:00Z",
   },
+  {
+    id: "inv_raw_101",
+    invoiceNo: "RAW/101",
+    date: "18/09/2026",
+    billType: "raw",
+    customerId: "cust_1",
+    customerName: "BALAJI CREATIONS & EMBROIDERY",
+    customerGstin: "24AALCB9941L1Z9",
+    customerAddress: "BLOCK B-12, SITARAM INDUSTRIAL ESTATE, PUNAGAM, SURAT",
+    customerCity: "SURAT",
+    customerState: "Gujarat",
+    customerStateCode: "24",
+    customerMobile: "9825144332",
+    items: [
+      {
+        id: "item_raw_1",
+        productId: "prod_1",
+        productName: "JARI ITEM",
+        hsn: "5605",
+        quantity: 150.0,
+        unit: "KG",
+        rate: 350.0,
+        taxableAmount: 52500.0,
+        gstRate: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        netAmount: 52500.0,
+      },
+    ],
+    totalQuantity: 150.0,
+    totalTaxable: 52500.0,
+    totalCgst: 0,
+    totalSgst: 0,
+    totalIgst: 0,
+    roundOff: 0.0,
+    grandTotal: 52500.0,
+    amountInWords: "FIFTY TWO THOUSAND FIVE HUNDRED RUPEES ONLY",
+    paymentStatus: "unpaid",
+    paidAmount: 0,
+    remainingAmount: 52500.0,
+    createdAt: "2026-09-18T10:00:00Z",
+  },
+  {
+    id: "inv_raw_102",
+    invoiceNo: "RAW/102",
+    date: "18/09/2026",
+    billType: "raw",
+    customerId: "cust_1",
+    customerName: "BALAJI CREATIONS & EMBROIDERY",
+    customerGstin: "24AALCB9941L1Z9",
+    customerAddress: "BLOCK B-12, SITARAM INDUSTRIAL ESTATE, PUNAGAM, SURAT",
+    customerCity: "SURAT",
+    customerState: "Gujarat",
+    customerStateCode: "24",
+    customerMobile: "9825144332",
+    items: [
+      {
+        id: "item_raw_2",
+        productId: "prod_2",
+        productName: "JARI KASAB",
+        hsn: "5605",
+        quantity: 75.0,
+        unit: "KG",
+        rate: 320.0,
+        taxableAmount: 24000.0,
+        gstRate: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        netAmount: 24000.0,
+      },
+    ],
+    totalQuantity: 75.0,
+    totalTaxable: 24000.0,
+    totalCgst: 0,
+    totalSgst: 0,
+    totalIgst: 0,
+    roundOff: 0.0,
+    grandTotal: 24000.0,
+    amountInWords: "TWENTY FOUR THOUSAND RUPEES ONLY",
+    paymentStatus: "unpaid",
+    paidAmount: 0,
+    remainingAmount: 24000.0,
+    createdAt: "2026-09-18T10:30:00Z",
+  },
 ];
 
 export const defaultPayments: PaymentRecord[] = [
@@ -1206,10 +1299,13 @@ export class BillingStore {
     const custInvoices = this.getInvoicesByCustomer(customerId);
     const custPayments = this.getPaymentsByCustomer(customerId);
 
-    const totalBilled = custInvoices.reduce(
-      (sum, inv) => sum + (Number(inv.grandTotal) || 0),
-      0
-    );
+    // Exclude converted raw bills from totalBilled to prevent duplicate billing
+    const totalBilled = custInvoices.reduce((sum, inv) => {
+      if (inv.billType === "raw" && inv.convertedToInvoiceId) {
+        return sum; // Already accounted for in the generated GST invoice!
+      }
+      return sum + (Number(inv.grandTotal) || 0);
+    }, 0);
     const totalPaid = custPayments.reduce(
       (sum, p) => sum + (Number(p.amount) || 0),
       0
@@ -1246,7 +1342,7 @@ export class BillingStore {
     for (const cust of customers) {
       const opening = Number(cust.openingBalance || 0);
       const billed = invoices
-        .filter((i) => i.customerId === cust.id)
+        .filter((i) => i.customerId === cust.id && !(i.billType === "raw" && i.convertedToInvoiceId))
         .reduce((s, i) => s + (Number(i.grandTotal) || 0), 0);
       const paid = payments
         .filter((p) => p.customerId === cust.id)
@@ -1413,6 +1509,39 @@ export class BillingStore {
     this.pushMutation("delete_invoice", undefined, id);
     if (inv) {
       this.recalculateCustomerBalance(inv.customerId);
+    }
+  }
+
+  static getRawBills(customerId?: string): Invoice[] {
+    return this.getInvoices().filter(
+      (inv) =>
+        inv.billType === "raw" && (!customerId || inv.customerId === customerId)
+    );
+  }
+
+  static getGstInvoices(customerId?: string): Invoice[] {
+    return this.getInvoices().filter(
+      (inv) =>
+        inv.billType !== "raw" && (!customerId || inv.customerId === customerId)
+    );
+  }
+
+  static markRawBillsConverted(rawBillIds: string[], gstInvoiceId: string): void {
+    const invoices = this.getInvoices();
+    let hasChanges = false;
+    const updated = invoices.map((inv) => {
+      if (rawBillIds.includes(inv.id)) {
+        hasChanges = true;
+        const modified = { ...inv, convertedToInvoiceId: gstInvoiceId };
+        this.pushMutation("save_invoice", modified);
+        return modified;
+      }
+      return inv;
+    });
+
+    if (hasChanges) {
+      this.setItem("invoices", updated);
+      this.recalculateAllCustomerBalances();
     }
   }
 

@@ -146,6 +146,9 @@ export async function runMigration() {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `;
+    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS bill_type TEXT DEFAULT 'gst';`;
+    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS source_raw_bill_ids JSONB;`;
+    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS converted_to_invoice_id TEXT;`;
 
     // 5. Create payments table
     console.log("Creating table: payments");

@@ -6,7 +6,8 @@ import Link from "next/link";
 import { BillingStore, Invoice, BusinessSettings } from "@/lib/store";
 import { InvoiceTemplate } from "@/components/invoice/invoice-template";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Printer, Share2, Download, Copy, Plus, Loader2, LayoutTemplate } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Printer, Share2, Download, Copy, Plus, Loader2, LayoutTemplate, FileCheck2 } from "lucide-react";
 import { buildWhatsAppInvoiceShareUrl } from "@/lib/billing-utils";
 import { downloadInvoicePDF } from "@/lib/pdf-download";
 import { toast } from "sonner";
@@ -115,11 +116,26 @@ export default function InvoiceDetailPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <span>Invoice {invoice.invoiceNo}</span>
+            <h1 className="text-base font-semibold text-foreground flex items-center gap-2 flex-wrap">
+              <span>{invoice.billType === "raw" ? "Raw Bill" : "Tax Invoice"} {invoice.invoiceNo}</span>
               <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
                 {invoice.customerName}
               </span>
+              {invoice.billType === "raw" ? (
+                invoice.convertedToInvoiceId ? (
+                  <Badge className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-300 text-xs">
+                    Converted
+                  </Badge>
+                ) : (
+                  <Badge className="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 text-xs">
+                    Pending GST Conversion
+                  </Badge>
+                )
+              ) : invoice.sourceRawBillIds && invoice.sourceRawBillIds.length > 0 ? (
+                <Badge className="bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border-purple-300 text-xs">
+                  From {invoice.sourceRawBillIds.length} Raw Bills
+                </Badge>
+              ) : null}
             </h1>
             <p className="text-xs text-muted-foreground">
               Billed on {invoice.date} &bull; Total: ₹{invoice.grandTotal}
@@ -128,6 +144,31 @@ export default function InvoiceDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Convert Button for unconverted raw bill */}
+          {invoice.billType === "raw" && !invoice.convertedToInvoiceId && (
+            <Button
+              asChild
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs h-9 px-3 rounded-md shadow-xs"
+            >
+              <Link href={`/invoices/new?convertRawBills=${invoice.id}&customerId=${invoice.customerId}`}>
+                <FileCheck2 className="h-3.5 w-3.5 mr-1" />
+                <span>Convert to GST Bill</span>
+              </Link>
+            </Button>
+          )}
+
+          {invoice.billType === "raw" && invoice.convertedToInvoiceId && (
+            <Button
+              asChild
+              variant="outline"
+              className="text-xs h-9 px-3 rounded-md border-purple-300 text-purple-700 dark:text-purple-300 hover:bg-purple-50"
+            >
+              <Link href={`/invoices/${invoice.convertedToInvoiceId}`}>
+                <span>View GST Bill</span>
+              </Link>
+            </Button>
+          )}
+
           {/* Template Selector */}
           <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-700">
             <LayoutTemplate className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
@@ -144,21 +185,23 @@ export default function InvoiceDetailPage() {
             </select>
           </div>
 
-          {/* Copy Selector */}
-          <div className="flex rounded-md bg-zinc-100 dark:bg-zinc-800 p-0.5 text-xs font-medium">
-            {(["Original", "Duplicate", "Triplicate"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setCopyType(type)}
-                className={`px-2.5 py-1 rounded-sm transition-all ${
-                  copyType === type
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-foreground"
-                }`}
-              >
-                {type}
-              </button>
-            ))}
+          {/* Copy Selector Dropdown */}
+          <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-700">
+            <select
+              value={copyType}
+              onChange={(e) => setCopyType(e.target.value as "Original" | "Duplicate" | "Triplicate")}
+              className="bg-transparent text-xs font-semibold text-zinc-900 dark:text-zinc-100 outline-none cursor-pointer pr-1"
+            >
+              <option value="Original" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                Original
+              </option>
+              <option value="Duplicate" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                Duplicate
+              </option>
+              <option value="Triplicate" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                Triplicate
+              </option>
+            </select>
           </div>
 
           <Button

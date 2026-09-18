@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import QRCode from "qrcode";
 import {
   BillingStore,
   BusinessSettings,
@@ -107,6 +108,19 @@ export default function SettingsPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const sigInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
+
+  const [liveSettingsUpiQr, setLiveSettingsUpiQr] = useState<string>("");
+
+  useEffect(() => {
+    if (settings.upiId && settings.upiId.trim().length > 0) {
+      const upiString = `upi://pay?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(settings.companyName || "Company")}&cu=INR`;
+      QRCode.toDataURL(upiString, { margin: 1, width: 220, errorCorrectionLevel: "M" })
+        .then(setLiveSettingsUpiQr)
+        .catch(() => setLiveSettingsUpiQr(""));
+    } else {
+      setLiveSettingsUpiQr("");
+    }
+  }, [settings.upiId, settings.companyName]);
 
   useEffect(() => {
     const loaded = BillingStore.getSettings();
@@ -2010,6 +2024,17 @@ export default function SettingsPage() {
                       />
                     </div>
                   </div>
+                  <div className="pt-2 border-t border-border flex items-center justify-between">
+                    <span className="text-[11px] text-muted-foreground font-medium">Monogram Badge Preview:</span>
+                    <div className="border px-3 py-1.5 rounded text-center bg-white dark:bg-zinc-900 shadow-xs">
+                      <span className="text-lg font-black tracking-tighter block font-serif text-purple-700 leading-none">
+                        {settings.monogramText || "SMJ"}
+                      </span>
+                      <span className="text-[7.5px] font-black tracking-wider block uppercase border-t mt-0.5 pt-0.5 text-zinc-700 dark:text-zinc-300">
+                        {settings.monogramSubtext || "THREAD & JARI"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -2022,21 +2047,64 @@ export default function SettingsPage() {
                     onChange={handleLogoUpload}
                     className="hidden"
                   />
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => logoInputRef.current?.click()}
-                      className="h-8 text-xs gap-1.5 cursor-pointer"
-                    >
-                      <Upload className="h-3.5 w-3.5" /> Upload Logo Image
-                    </Button>
-                    {settings.logoUrl && (
-                      <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Image Loaded
-                      </span>
-                    )}
-                  </div>
+                  {settings.logoUrl ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          Uploaded Logo Preview
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => logoInputRef.current?.click()}
+                            className="h-7 text-xs cursor-pointer"
+                          >
+                            Change Logo
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const updated = { ...settings, logoUrl: "" };
+                              setSettings(updated);
+                              BillingStore.saveSettings(updated);
+                              toast.info("Logo image removed");
+                            }}
+                            className="h-7 text-xs text-red-500 hover:text-red-600 cursor-pointer"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Visual Preview Box */}
+                      <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-center min-h-[110px] shadow-xs">
+                        <img
+                          src={settings.logoUrl}
+                          alt="Company Logo"
+                          className="max-h-24 max-w-[220px] object-contain rounded"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 space-y-2">
+                      <div className="text-muted-foreground text-xs">
+                        No logo image currently uploaded.
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => logoInputRef.current?.click()}
+                        className="h-8 text-xs gap-1.5 cursor-pointer"
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Upload Logo Image (PNG/JPG)
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -2100,7 +2168,7 @@ export default function SettingsPage() {
               </div>
 
               {settings.signatureType === "image" && (
-                <div className="p-3 bg-muted/40 rounded-lg border border-border">
+                <div className="p-3 bg-muted/40 rounded-lg border border-border space-y-3">
                   <input
                     ref={sigInputRef}
                     type="file"
@@ -2108,14 +2176,76 @@ export default function SettingsPage() {
                     onChange={handleSignatureUpload}
                     className="hidden"
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => sigInputRef.current?.click()}
-                    className="h-8 text-xs gap-1.5 cursor-pointer"
+                  {settings.signatureUrl ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          Uploaded Stamp / Signature Preview
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => sigInputRef.current?.click()}
+                            className="h-7 text-xs cursor-pointer"
+                          >
+                            Change Stamp
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const updated = { ...settings, signatureUrl: "" };
+                              setSettings(updated);
+                              BillingStore.saveSettings(updated);
+                              toast.info("Signature stamp removed");
+                            }}
+                            className="h-7 text-xs text-red-500 hover:text-red-600 cursor-pointer"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Visual Preview Box */}
+                      <div className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-center min-h-[90px] shadow-xs">
+                        <img
+                          src={settings.signatureUrl}
+                          alt="Authorized Signature Stamp"
+                          className="max-h-20 max-w-[200px] object-contain rounded"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 space-y-2">
+                      <div className="text-muted-foreground text-xs">
+                        No signature or stamp image uploaded.
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => sigInputRef.current?.click()}
+                        className="h-8 text-xs gap-1.5 cursor-pointer"
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Upload Signature / Stamp PNG
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {settings.signatureType === "font" && (
+                <div className="p-3 bg-muted/40 rounded-lg border border-border flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground font-medium">Digital Signature Preview:</span>
+                  <span
+                    className="text-2xl font-bold italic tracking-wider text-blue-900 dark:text-blue-400"
+                    style={{ fontFamily: settings.signatureFont || "'Brush Script MT', cursive, sans-serif" }}
                   >
-                    <Upload className="h-3.5 w-3.5" /> Upload Signature / Stamp PNG
-                  </Button>
+                    {settings.authorizedSignatoryName || "Authorized Signatory"}
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -2198,8 +2328,89 @@ export default function SettingsPage() {
                     onClick={() => qrInputRef.current?.click()}
                     className="h-9 text-xs gap-1.5 cursor-pointer w-full"
                   >
-                    <QrCode className="h-4 w-4" /> Upload Custom QR Code Image
+                    <Upload className="h-4 w-4" /> Upload Custom QR Code Image
                   </Button>
+                </div>
+              </div>
+
+              {/* Live QR Previews (Custom Upload & Auto UPI) */}
+              <div className="space-y-2 md:col-span-2 pt-2 border-t border-border">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <QrCode className="h-4 w-4 text-purple-600" />
+                  <span>Payment QR Code Live Previews</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Custom Uploaded QR Preview */}
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border flex flex-col items-center justify-center text-center space-y-2">
+                    <span className="text-[11px] font-semibold text-muted-foreground">Custom Uploaded QR Image</span>
+                    {settings.qrCodeUrl ? (
+                      <div className="space-y-2 flex flex-col items-center">
+                        <div className="p-2 bg-white rounded-md border shadow-xs">
+                          <img
+                            src={settings.qrCodeUrl}
+                            alt="Custom QR Code"
+                            className="w-28 h-28 object-contain"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => qrInputRef.current?.click()}
+                            className="h-6 text-[11px] px-2"
+                          >
+                            Change
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const updated = { ...settings, qrCodeUrl: "" };
+                              setSettings(updated);
+                              BillingStore.saveSettings(updated);
+                              toast.info("Custom QR removed");
+                            }}
+                            className="h-6 text-[11px] px-2 text-red-500 hover:text-red-600"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center text-muted-foreground text-[11px]">
+                        No custom QR image uploaded.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Auto-Generated UPI QR Preview */}
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border flex flex-col items-center justify-center text-center space-y-2">
+                    <span className="text-[11px] font-semibold text-muted-foreground">Auto-Generated Dynamic UPI QR</span>
+                    {liveSettingsUpiQr ? (
+                      <div className="space-y-1.5 flex flex-col items-center">
+                        <div className="p-2 bg-white rounded-md border shadow-xs">
+                          <img
+                            src={liveSettingsUpiQr}
+                            alt="Dynamic UPI QR"
+                            className="w-28 h-28 object-contain"
+                          />
+                        </div>
+                        <span className="text-[10px] font-mono text-purple-700 dark:text-purple-300 font-semibold truncate max-w-[200px]">
+                          {settings.upiId}
+                        </span>
+                        <span className="text-[9.5px] text-emerald-600 font-medium">
+                          Active on invoice bank details
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center text-muted-foreground text-[11px]">
+                        Enter a UPI ID above to generate a dynamic payment QR code.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

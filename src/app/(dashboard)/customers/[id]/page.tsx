@@ -40,6 +40,7 @@ import {
   Pencil,
   MapPin,
   Mail,
+  CheckCircle2,
 } from "lucide-react";
 import { InvoicePreviewModal } from "@/components/invoice/invoice-preview-modal";
 import { toast } from "sonner";
@@ -88,6 +89,10 @@ export default function CustomerProfilePage() {
   // Selected Invoice Preview
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Raw vs GST Bill Hierarchy Filter
+  const [billTypeTab, setBillTypeTab] = useState<"all" | "gst" | "raw">("all");
+  const [selectedRawBillIds, setSelectedRawBillIds] = useState<string[]>([]);
 
   // Record Payment Modal
   const [isPayOpen, setIsPayOpen] = useState(false);
@@ -229,10 +234,43 @@ export default function CustomerProfilePage() {
     toast.success(`Recorded payment of ${formatINR(amt)}!`);
   };
 
-  // Financial Stats
-  const totalBilled = invoices.reduce((s, i) => s + i.grandTotal, 0);
+  // Financial Stats - Exclude converted raw bills from totalBilled to avoid duplicate counting!
+  const totalBilled = invoices.reduce((s, i) => {
+    if (i.billType === "raw" && i.convertedToInvoiceId) return s;
+    return s + i.grandTotal;
+  }, 0);
   const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
   const outstanding = (customer?.openingBalance || 0) + totalBilled - totalPaid;
+
+  const rawInvoices = useMemo(
+    () => invoices.filter((inv) => inv.billType === "raw"),
+    [invoices]
+  );
+  const pendingRawInvoices = useMemo(
+    () => rawInvoices.filter((inv) => !inv.convertedToInvoiceId),
+    [rawInvoices]
+  );
+  const gstInvoices = useMemo(
+    () => invoices.filter((inv) => inv.billType !== "raw"),
+    [invoices]
+  );
+
+  const filteredInvoices = useMemo(() => {
+    if (billTypeTab === "gst") return gstInvoices;
+    if (billTypeTab === "raw") return rawInvoices;
+    return invoices;
+  }, [invoices, billTypeTab, gstInvoices, rawInvoices]);
+
+  const selectableInvoices = useMemo(() => {
+    return filteredInvoices.filter((i) => i.billType === "raw");
+  }, [filteredInvoices]);
+
+  const selectedRawBillsTotal = useMemo(() => {
+    return selectedRawBillIds.reduce((sum, id) => {
+      const inv = invoices.find((i) => i.id === id);
+      return sum + (inv ? Number(inv.grandTotal) : 0);
+    }, 0);
+  }, [selectedRawBillIds, invoices]);
 
   // Combined Ledger Timeline with Running Balance Calculation
   const ledgerEntries = useMemo(() => {
@@ -263,6 +301,10 @@ export default function CustomerProfilePage() {
     }
 
     invoices.forEach((inv) => {
+      // Exclude converted raw bills from ledger to prevent double-debiting
+      if (inv.billType === "raw" && inv.convertedToInvoiceId) {
+        return;
+      }
       rawEntries.push({
         id: inv.id,
         date: inv.date,
@@ -270,7 +312,10 @@ export default function CustomerProfilePage() {
         reference: inv.invoiceNo,
         debit: inv.grandTotal,
         credit: 0,
-        notes: `Tax Invoice (${inv.items.length} items)`,
+        notes:
+          inv.billType === "raw"
+            ? `Raw Bill (${inv.items.length} items)`
+            : `Tax Invoice (${inv.items.length} items)`,
         rawTimestamp: new Date(inv.createdAt || inv.date).getTime(),
       });
     });
@@ -361,11 +406,22 @@ export default function CustomerProfilePage() {
 
           <Button
             asChild
+            variant="outline"
+            className="h-10 px-3 rounded-md border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 font-semibold text-xs sm:text-sm"
+          >
+            <Link href={`/invoices/new?customerId=${customer.id}&billType=raw`}>
+              <Plus className="h-4 w-4 mr-1" />
+              <span>New Raw Bill</span>
+            </Link>
+          </Button>
+
+          <Button
+            asChild
             className="h-10 px-4 rounded-md bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-md text-xs sm:text-sm"
           >
             <Link href={`/invoices/new?customerId=${customer.id}`}>
               <Plus className="h-4 w-4 mr-1.5" />
-              <span>Create Bill</span>
+              <span>Create GST Bill</span>
             </Link>
           </Button>
         </div>
@@ -458,112 +514,318 @@ export default function CustomerProfilePage() {
 
         {/* 1. Customer-Wise Invoices Store */}
         <TabsContent value="invoices" className="space-y-4">
+          {/* Multi-Select Conversion Banner for Raw Bills */}
+          {selectedRawBillIds.length > 0 && (
+            <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2 text-xs">
+                <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <span className="font-semibold text-foreground">
+                  {selectedRawBillIds.length} Raw Bills selected (Combined Total:{" "}
+                  <strong className="text-purple-700 dark:text-purple-300 font-mono text-sm">
+                    {formatINR(selectedRawBillsTotal)}
+                  </strong>
+                  )
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedRawBillIds([])}
+                  className="h-8 text-xs text-muted-foreground"
+                >
+                  Clear Selection
+                </Button>
+                <Button
+                  asChild
+                  size="sm"
+                  className="h-8 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-md shadow-xs"
+                >
+                  <Link
+                    href={`/invoices/new?customerId=${customer.id}&convertRawBills=${selectedRawBillIds.join(
+                      ","
+                    )}`}
+                  >
+                    <span>Create GST Bill from Selected ({selectedRawBillIds.length})</span>
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Card className="border-[#ececee] dark:border-[#1a1822] shadow-xs overflow-hidden rounded-lg">
-            <CardHeader className="pb-3 border-b border-[#ececee] dark:border-[#1a1822] flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-foreground">
-                Invoices Generated for {customer.businessName}
-              </CardTitle>
-              <Button
-                asChild
-                size="sm"
-                className="h-8 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-md"
-              >
-                <Link href={`/invoices/new?customerId=${customer.id}`}>
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  <span>New Bill</span>
-                </Link>
-              </Button>
+            <CardHeader className="pb-3 border-b border-[#ececee] dark:border-[#1a1822] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  Bills &amp; Invoices
+                </CardTitle>
+                {/* Sub-Filters */}
+                <div className="flex items-center gap-1 p-0.5 bg-zinc-100 dark:bg-[#181922] rounded-md border text-[11px] font-semibold">
+                  <button
+                    onClick={() => setBillTypeTab("all")}
+                    className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                      billTypeTab === "all"
+                        ? "bg-white dark:bg-zinc-800 text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All ({invoices.length})
+                  </button>
+                  <button
+                    onClick={() => setBillTypeTab("gst")}
+                    className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                      billTypeTab === "gst"
+                        ? "bg-white dark:bg-zinc-800 text-purple-600 dark:text-purple-300 shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Official GST ({gstInvoices.length})
+                  </button>
+                  <button
+                    onClick={() => setBillTypeTab("raw")}
+                    className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                      billTypeTab === "raw"
+                        ? "bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Raw Bills ({rawInvoices.length})
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs font-semibold border-amber-300 text-amber-800 dark:text-amber-300 hover:bg-amber-50 rounded-md"
+                >
+                  <Link href={`/invoices/new?customerId=${customer.id}&billType=raw`}>
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    <span>Raw Bill</span>
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  size="sm"
+                  className="h-8 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-md"
+                >
+                  <Link href={`/invoices/new?customerId=${customer.id}`}>
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    <span>New GST Bill</span>
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
+
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-zinc-50 dark:bg-[#181922] border-b border-[#ececee] dark:border-[#2d2f39] text-muted-foreground font-semibold text-[11px]">
-                      <th className="p-3 w-28">Bill No</th>
+                      <th className="p-3 w-10 text-center">
+                        {selectableInvoices.length > 0 && (
+                          <input
+                            type="checkbox"
+                            title="Select all raw bills to convert to GST Bill"
+                            checked={
+                              selectableInvoices.length > 0 &&
+                              selectableInvoices.every((i) =>
+                                selectedRawBillIds.includes(i.id)
+                              )
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const idsToAdd = selectableInvoices.map((i) => i.id);
+                                setSelectedRawBillIds((prev) =>
+                                  Array.from(new Set([...prev, ...idsToAdd]))
+                                );
+                              } else {
+                                const idsToRemove = new Set(
+                                  selectableInvoices.map((i) => i.id)
+                                );
+                                setSelectedRawBillIds((prev) =>
+                                  prev.filter((id) => !idsToRemove.has(id))
+                                );
+                              }
+                            }}
+                            className="rounded cursor-pointer"
+                          />
+                        )}
+                      </th>
+                      <th className="p-3 w-32">Bill Type &amp; No</th>
                       <th className="p-3 w-24">Date</th>
                       <th className="p-3 min-w-[200px]">Line Items Summary</th>
                       <th className="p-3 w-28 text-right">Net Wt</th>
                       <th className="p-3 w-32 text-right">Bill Total (₹)</th>
-                      <th className="p-3 w-24 text-center">Status</th>
-                      <th className="p-3 w-40 text-right">Actions</th>
+                      <th className="p-3 w-32 text-center">Conversion / Status</th>
+                      <th className="p-3 min-w-[240px] text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#ececee] dark:divide-[#2d2f39]">
-                    {invoices.length === 0 ? (
+                    {filteredInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                          No invoices generated for this customer yet.
+                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                          No bills found under this category.
                         </td>
                       </tr>
                     ) : (
-                      invoices.map((inv) => (
-                        <tr
-                          key={inv.id}
-                          className="hover:bg-zinc-50/50 dark:hover:bg-[#121016] transition-colors"
-                        >
-                          <td className="p-3 font-mono font-semibold text-purple-700 dark:text-purple-300">
-                            {inv.invoiceNo}
-                          </td>
-                          <td className="p-3 text-muted-foreground font-normal">{inv.date}</td>
-                          <td className="p-3">
-                            <div className="font-semibold text-foreground uppercase truncate max-w-xs">
-                              {inv.items.map((it) => it.productName).join(", ")}
-                            </div>
-                            <span className="text-[10px] text-muted-foreground">
-                              {inv.items.length} line items
-                            </span>
-                          </td>
-                          <td className="p-3 text-right font-mono font-medium">
-                            {formatNumber(inv.totalQuantity, 3)} KG
-                          </td>
-                          <td className="p-3 text-right font-mono font-semibold text-sm">
-                            {formatINR(inv.grandTotal)}
-                          </td>
-                          <td className="p-3 text-center">
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] font-medium px-2 py-0.5 rounded-md uppercase ${inv.paymentStatus === "paid"
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200"
-                                : inv.paymentStatus === "partial"
-                                  ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200"
-                                  : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-200"
-                                }`}
-                            >
-                              {inv.paymentStatus}
-                            </Badge>
-                          </td>
-                          <td className="p-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <Button
-                                onClick={() => {
-                                  setSelectedInvoice(inv);
-                                  setIsPreviewOpen(true);
-                                }}
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-xs font-semibold text-purple-600 rounded-md"
-                              >
-                                <Eye className="h-3.5 w-3.5 mr-1" />
-                                <span>View</span>
-                              </Button>
+                      filteredInvoices.map((inv) => {
+                        const isRaw = inv.billType === "raw";
+                        const isConverted = isRaw && Boolean(inv.convertedToInvoiceId);
+                        const isSelected = selectedRawBillIds.includes(inv.id);
 
-                              <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-2 text-xs font-medium rounded-md"
-                              >
-                                <Link
-                                  href={`/invoices/new?duplicateFrom=${inv.id}`}
+                        return (
+                          <tr
+                            key={inv.id}
+                            className={`hover:bg-zinc-50/50 dark:hover:bg-[#121016] transition-colors ${
+                              isSelected ? "bg-purple-50/40 dark:bg-purple-950/20" : ""
+                            }`}
+                          >
+                            <td className="p-3 text-center">
+                              {isRaw && (
+                                <input
+                                  type="checkbox"
+                                  title="Select this raw bill to generate GST Bill"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedRawBillIds((prev) => [...prev, inv.id]);
+                                    } else {
+                                      setSelectedRawBillIds((prev) =>
+                                        prev.filter((id) => id !== inv.id)
+                                      );
+                                    }
+                                  }}
+                                  className="rounded cursor-pointer"
+                                />
+                              )}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`font-mono font-bold text-sm ${
+                                    isRaw
+                                      ? "text-amber-700 dark:text-amber-400"
+                                      : "text-purple-700 dark:text-purple-300"
+                                  }`}
                                 >
-                                  <Copy className="h-3.5 w-3.5 mr-1" />
-                                  <span>Repeat</span>
-                                </Link>
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                                  {inv.invoiceNo}
+                                </span>
+                              </div>
+                              <div className="text-[10px] mt-0.5">
+                                {isRaw ? (
+                                  <span className="text-amber-600 dark:text-amber-400 font-semibold uppercase">
+                                    Raw Bill
+                                  </span>
+                                ) : (
+                                  <span className="text-purple-600 dark:text-purple-400 font-semibold uppercase">
+                                    Official GST
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-muted-foreground font-normal">{inv.date}</td>
+                            <td className="p-3">
+                              <div className="font-semibold text-foreground uppercase truncate max-w-xs">
+                                {inv.items.map((it) => it.productName).join(", ")}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {inv.items.length} line items
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-mono font-medium">
+                              {formatNumber(inv.totalQuantity, 3)} KG
+                            </td>
+                            <td className="p-3 text-right font-mono font-semibold text-sm">
+                              {formatINR(inv.grandTotal)}
+                            </td>
+                            <td className="p-3 text-center">
+                              {isRaw ? (
+                                isConverted ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300"
+                                  >
+                                    Converted
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300"
+                                  >
+                                    Pending Conversion
+                                  </Badge>
+                                )
+                              ) : inv.sourceRawBillIds && inv.sourceRawBillIds.length > 0 ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-800 dark:bg-purple-950/50 dark:text-purple-300 border-purple-300"
+                                >
+                                  From {inv.sourceRawBillIds.length} Raw Bills
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] font-medium px-2 py-0.5 rounded-md uppercase ${
+                                    inv.paymentStatus === "paid"
+                                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200"
+                                      : inv.paymentStatus === "partial"
+                                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200"
+                                      : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-200"
+                                  }`}
+                                >
+                                  {inv.paymentStatus}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {isRaw && (
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    className="h-8 px-2.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-md whitespace-nowrap shadow-2xs cursor-pointer"
+                                  >
+                                    <Link
+                                      href={`/invoices/new?customerId=${customer.id}&convertRawBills=${inv.id}`}
+                                    >
+                                      <FileText className="h-3.5 w-3.5 mr-1" />
+                                      <span>Generate GST Bill</span>
+                                    </Link>
+                                  </Button>
+                                )}
+
+                                <Button
+                                  onClick={() => {
+                                    setSelectedInvoice(inv);
+                                    setIsPreviewOpen(true);
+                                  }}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs font-semibold text-purple-600 rounded-md cursor-pointer"
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1" />
+                                  <span>View</span>
+                                </Button>
+
+                                <Button
+                                  asChild
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs font-medium rounded-md cursor-pointer"
+                                >
+                                  <Link href={`/invoices/new?duplicateFrom=${inv.id}`}>
+                                    <Copy className="h-3.5 w-3.5 mr-1" />
+                                    <span>Repeat</span>
+                                  </Link>
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

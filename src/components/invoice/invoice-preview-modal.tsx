@@ -95,30 +95,37 @@ export function InvoicePreviewModal({
       <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-4 sm:p-6 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-800 shadow-2xl">
         <DialogHeader className="flex flex-row items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
           <div>
-            <DialogTitle className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <span>Invoice {invoice.invoiceNo}</span>
+            <DialogTitle className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2 flex-wrap">
+              <span>{invoice.billType === "raw" ? "Raw Bill" : "Tax Invoice"} {invoice.invoiceNo}</span>
               <span className="text-xs px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 font-semibold">
                 {invoice.customerName}
               </span>
+              {invoice.billType === "raw" && (
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-semibold">
+                  {invoice.convertedToInvoiceId ? "Converted" : "Non-GST"}
+                </span>
+              )}
             </DialogTitle>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Copy selector */}
-            <div className="flex rounded-md bg-zinc-100 dark:bg-zinc-800 p-0.5 text-xs font-medium border border-zinc-200/80 dark:border-zinc-700/60">
-              {(["Original", "Duplicate", "Triplicate"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setCopyType(type)}
-                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                    copyType === type
-                      ? "bg-purple-600 text-white shadow-xs font-semibold"
-                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
+            {/* Copy selector dropdown */}
+            <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-md border border-zinc-200/80 dark:border-zinc-700/60">
+              <select
+                value={copyType}
+                onChange={(e) => setCopyType(e.target.value as "Original" | "Duplicate" | "Triplicate")}
+                className="bg-transparent text-xs font-semibold text-zinc-900 dark:text-zinc-100 outline-none cursor-pointer pr-1"
+              >
+                <option value="Original" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                  Original
+                </option>
+                <option value="Duplicate" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                  Duplicate
+                </option>
+                <option value="Triplicate" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+                  Triplicate
+                </option>
+              </select>
             </div>
           </div>
         </DialogHeader>

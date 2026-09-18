@@ -20,42 +20,42 @@ export async function GET() {
     if (settingsRows.length > 0) {
       const s = settingsRows[0];
       settings = {
-        companyName: s.company_name || defaultBusinessSettings.companyName,
-        devotionalHeader: s.devotional_header || defaultBusinessSettings.devotionalHeader,
-        tradeName: s.trade_name || defaultBusinessSettings.tradeName,
-        address: s.address || defaultBusinessSettings.address,
-        city: s.city || defaultBusinessSettings.city,
-        state: s.state || defaultBusinessSettings.state,
-        stateCode: s.state_code || defaultBusinessSettings.stateCode,
-        pincode: s.pincode || defaultBusinessSettings.pincode,
-        gstin: s.gstin || defaultBusinessSettings.gstin,
-        pan: s.pan || defaultBusinessSettings.pan,
-        phone: s.phone || defaultBusinessSettings.phone,
-        phoneAlt: s.phone_alt || defaultBusinessSettings.phoneAlt,
-        email: s.email || defaultBusinessSettings.email,
-        bankName: s.bank_name || defaultBusinessSettings.bankName,
-        branchName: s.branch_name || defaultBusinessSettings.branchName,
-        accountNumber: s.account_number || defaultBusinessSettings.accountNumber,
-        ifscCode: s.ifsc_code || defaultBusinessSettings.ifscCode,
-        invoicePrefix: s.invoice_prefix || defaultBusinessSettings.invoicePrefix,
-        financialYear: s.financial_year || defaultBusinessSettings.financialYear,
+        companyName: s.company_name !== null && s.company_name !== undefined ? s.company_name : defaultBusinessSettings.companyName,
+        devotionalHeader: s.devotional_header !== null && s.devotional_header !== undefined ? s.devotional_header : defaultBusinessSettings.devotionalHeader,
+        tradeName: s.trade_name !== null && s.trade_name !== undefined ? s.trade_name : defaultBusinessSettings.tradeName,
+        address: s.address !== null && s.address !== undefined ? s.address : defaultBusinessSettings.address,
+        city: s.city !== null && s.city !== undefined ? s.city : defaultBusinessSettings.city,
+        state: s.state !== null && s.state !== undefined ? s.state : defaultBusinessSettings.state,
+        stateCode: s.state_code !== null && s.state_code !== undefined ? s.state_code : defaultBusinessSettings.stateCode,
+        pincode: s.pincode !== null && s.pincode !== undefined ? s.pincode : defaultBusinessSettings.pincode,
+        gstin: s.gstin !== null && s.gstin !== undefined ? s.gstin : defaultBusinessSettings.gstin,
+        pan: s.pan !== null && s.pan !== undefined ? s.pan : defaultBusinessSettings.pan,
+        phone: s.phone !== null && s.phone !== undefined ? s.phone : defaultBusinessSettings.phone,
+        phoneAlt: s.phone_alt !== null && s.phone_alt !== undefined ? s.phone_alt : "",
+        email: s.email !== null && s.email !== undefined ? s.email : "",
+        bankName: s.bank_name !== null && s.bank_name !== undefined ? s.bank_name : defaultBusinessSettings.bankName,
+        branchName: s.branch_name !== null && s.branch_name !== undefined ? s.branch_name : defaultBusinessSettings.branchName,
+        accountNumber: s.account_number !== null && s.account_number !== undefined ? s.account_number : defaultBusinessSettings.accountNumber,
+        ifscCode: s.ifsc_code !== null && s.ifsc_code !== undefined ? s.ifsc_code : defaultBusinessSettings.ifscCode,
+        invoicePrefix: s.invoice_prefix !== null && s.invoice_prefix !== undefined ? s.invoice_prefix : defaultBusinessSettings.invoicePrefix,
+        financialYear: s.financial_year !== null && s.financial_year !== undefined ? s.financial_year : defaultBusinessSettings.financialYear,
         startingInvoiceNo: Number(s.starting_invoice_no || 145),
         roundOffMode: (s.round_off_mode || "nearest_1") as any,
         termsAndConditions: (s.terms_and_conditions as string[]) || defaultBusinessSettings.termsAndConditions,
         logoType: (s.logo_type || "monogram") as any,
         logoUrl: s.logo_url || undefined,
-        monogramText: s.monogram_text || "DTJ",
-        monogramSubtext: s.monogram_subtext || "DHARMI THREAD & JARI",
+        monogramText: s.monogram_text !== null && s.monogram_text !== undefined ? s.monogram_text : "DTJ",
+        monogramSubtext: s.monogram_subtext !== null && s.monogram_subtext !== undefined ? s.monogram_subtext : "DHARMI THREAD & JARI",
         signatureType: (s.signature_type || "font") as any,
         signatureUrl: s.signature_url || undefined,
         signatureFont: s.signature_font || "Great Vibes",
-        authorizedSignatoryName: s.authorized_signatory_name || "Pravinbhai K. Sheladiya",
-        signatoryFirmTitle: s.signatory_firm_title || "FOR, DHARMI THREAD & JARI",
-        signatoryLabel: s.signatory_label || "Authorised Signatory",
+        authorizedSignatoryName: s.authorized_signatory_name !== null && s.authorized_signatory_name !== undefined ? s.authorized_signatory_name : "Pravinbhai K. Sheladiya",
+        signatoryFirmTitle: s.signatory_firm_title !== null && s.signatory_firm_title !== undefined ? s.signatory_firm_title : "FOR, DHARMI THREAD & JARI",
+        signatoryLabel: s.signatory_label !== null && s.signatory_label !== undefined ? s.signatory_label : "Authorised Signatory",
         showQrCode: s.show_qr_code === "true" || s.show_qr_code === true,
         qrCodeType: (s.qr_code_type || "auto") as any,
         qrCodeUrl: s.qr_code_url || undefined,
-        upiId: s.upi_id || "9925606480@kotak",
+        upiId: s.upi_id !== null && s.upi_id !== undefined ? s.upi_id : "",
         activeTemplateId: s.active_template_id || defaultBusinessSettings.activeTemplateId,
         templates: (typeof s.templates === "string" ? JSON.parse(s.templates) : s.templates) || defaultBusinessSettings.templates,
       };
@@ -110,6 +110,9 @@ export async function GET() {
       dueDate: inv.due_date || undefined,
       notes: inv.notes || undefined,
       createdAt: inv.created_at || new Date().toISOString(),
+      billType: (inv.bill_type as any) || "gst",
+      sourceRawBillIds: (typeof inv.source_raw_bill_ids === "string" ? JSON.parse(inv.source_raw_bill_ids) : inv.source_raw_bill_ids) || [],
+      convertedToInvoiceId: inv.converted_to_invoice_id || undefined,
     }));
 
     // 4. Fetch payments
@@ -133,7 +136,7 @@ export async function GET() {
     const customers: Customer[] = customerRows.map((c) => {
       const openBal = Number(c.opening_balance || 0);
       const billed = invoices
-        .filter((i) => i.customerId === c.id)
+        .filter((i) => i.customerId === c.id && !(i.billType === "raw" && i.convertedToInvoiceId))
         .reduce((s, i) => s + (Number(i.grandTotal) || 0), 0);
       const paid = payments
         .filter((p) => p.customerId === c.id)
@@ -356,56 +359,115 @@ export async function POST(req: Request) {
     }
 
     if (action === "save_invoice" && data) {
-      await sql`
-        INSERT INTO invoices (
-          id, invoice_no, date, customer_id, customer_name, customer_gstin, customer_address,
-          customer_city, customer_state, customer_state_code, customer_mobile, ack_no, ack_date,
-          irn, eway_bill_no, vehicle_no, transport_no, items, total_quantity, total_taxable,
-          total_cgst, total_sgst, total_igst, round_off, grand_total, amount_in_words,
-          payment_status, paid_amount, remaining_amount, due_date, notes, created_at
-        ) VALUES (
-          ${data.id}, ${data.invoiceNo}, ${data.date}, ${data.customerId}, ${data.customerName},
-          ${data.customerGstin || null}, ${data.customerAddress || null}, ${data.customerCity || null},
-          ${data.customerState || null}, ${data.customerStateCode || null}, ${data.customerMobile || null},
-          ${data.ackNo || null}, ${data.ackDate || null}, ${data.irn || null}, ${data.ewayBillNo || null},
-          ${data.vehicleNo || null}, ${data.transportNo || null}, ${JSON.stringify(data.items)},
-          ${data.totalQuantity}, ${data.totalTaxable}, ${data.totalCgst || 0}, ${data.totalSgst || 0},
-          ${data.totalIgst || 0}, ${data.roundOff || 0}, ${data.grandTotal}, ${data.amountInWords},
-          ${data.paymentStatus || 'unpaid'}, ${data.paidAmount || 0}, ${data.remainingAmount || 0},
-          ${data.dueDate || null}, ${data.notes || null}, ${data.createdAt || new Date().toISOString()}
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          invoice_no = EXCLUDED.invoice_no,
-          date = EXCLUDED.date,
-          customer_id = EXCLUDED.customer_id,
-          customer_name = EXCLUDED.customer_name,
-          customer_gstin = EXCLUDED.customer_gstin,
-          customer_address = EXCLUDED.customer_address,
-          customer_city = EXCLUDED.customer_city,
-          customer_state = EXCLUDED.customer_state,
-          customer_state_code = EXCLUDED.customer_state_code,
-          customer_mobile = EXCLUDED.customer_mobile,
-          ack_no = EXCLUDED.ack_no,
-          ack_date = EXCLUDED.ack_date,
-          irn = EXCLUDED.irn,
-          eway_bill_no = EXCLUDED.eway_bill_no,
-          vehicle_no = EXCLUDED.vehicle_no,
-          transport_no = EXCLUDED.transport_no,
-          items = EXCLUDED.items,
-          total_quantity = EXCLUDED.total_quantity,
-          total_taxable = EXCLUDED.total_taxable,
-          total_cgst = EXCLUDED.total_cgst,
-          total_sgst = EXCLUDED.total_sgst,
-          total_igst = EXCLUDED.total_igst,
-          round_off = EXCLUDED.round_off,
-          grand_total = EXCLUDED.grand_total,
-          amount_in_words = EXCLUDED.amount_in_words,
-          payment_status = EXCLUDED.payment_status,
-          paid_amount = EXCLUDED.paid_amount,
-          remaining_amount = EXCLUDED.remaining_amount,
-          due_date = EXCLUDED.due_date,
-          notes = EXCLUDED.notes;
-      `;
+      try {
+        await sql`
+          INSERT INTO invoices (
+            id, invoice_no, date, customer_id, customer_name, customer_gstin, customer_address,
+            customer_city, customer_state, customer_state_code, customer_mobile, ack_no, ack_date,
+            irn, eway_bill_no, vehicle_no, transport_no, items, total_quantity, total_taxable,
+            total_cgst, total_sgst, total_igst, round_off, grand_total, amount_in_words,
+            payment_status, paid_amount, remaining_amount, due_date, notes, created_at,
+            bill_type, source_raw_bill_ids, converted_to_invoice_id
+          ) VALUES (
+            ${data.id}, ${data.invoiceNo}, ${data.date}, ${data.customerId}, ${data.customerName},
+            ${data.customerGstin || null}, ${data.customerAddress || null}, ${data.customerCity || null},
+            ${data.customerState || null}, ${data.customerStateCode || null}, ${data.customerMobile || null},
+            ${data.ackNo || null}, ${data.ackDate || null}, ${data.irn || null}, ${data.ewayBillNo || null},
+            ${data.vehicleNo || null}, ${data.transportNo || null}, ${JSON.stringify(data.items)},
+            ${data.totalQuantity}, ${data.totalTaxable}, ${data.totalCgst || 0}, ${data.totalSgst || 0},
+            ${data.totalIgst || 0}, ${data.roundOff || 0}, ${data.grandTotal}, ${data.amountInWords},
+            ${data.paymentStatus || 'unpaid'}, ${data.paidAmount || 0}, ${data.remainingAmount || 0},
+            ${data.dueDate || null}, ${data.notes || null}, ${data.createdAt || new Date().toISOString()},
+            ${data.billType || 'gst'}, ${JSON.stringify(data.sourceRawBillIds || [])}, ${data.convertedToInvoiceId || null}
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            invoice_no = EXCLUDED.invoice_no,
+            date = EXCLUDED.date,
+            customer_id = EXCLUDED.customer_id,
+            customer_name = EXCLUDED.customer_name,
+            customer_gstin = EXCLUDED.customer_gstin,
+            customer_address = EXCLUDED.customer_address,
+            customer_city = EXCLUDED.customer_city,
+            customer_state = EXCLUDED.customer_state,
+            customer_state_code = EXCLUDED.customer_state_code,
+            customer_mobile = EXCLUDED.customer_mobile,
+            ack_no = EXCLUDED.ack_no,
+            ack_date = EXCLUDED.ack_date,
+            irn = EXCLUDED.irn,
+            eway_bill_no = EXCLUDED.eway_bill_no,
+            vehicle_no = EXCLUDED.vehicle_no,
+            transport_no = EXCLUDED.transport_no,
+            items = EXCLUDED.items,
+            total_quantity = EXCLUDED.total_quantity,
+            total_taxable = EXCLUDED.total_taxable,
+            total_cgst = EXCLUDED.total_cgst,
+            total_sgst = EXCLUDED.total_sgst,
+            total_igst = EXCLUDED.total_igst,
+            round_off = EXCLUDED.round_off,
+            grand_total = EXCLUDED.grand_total,
+            amount_in_words = EXCLUDED.amount_in_words,
+            payment_status = EXCLUDED.payment_status,
+            paid_amount = EXCLUDED.paid_amount,
+            remaining_amount = EXCLUDED.remaining_amount,
+            due_date = EXCLUDED.due_date,
+            notes = EXCLUDED.notes,
+            bill_type = EXCLUDED.bill_type,
+            source_raw_bill_ids = EXCLUDED.source_raw_bill_ids,
+            converted_to_invoice_id = EXCLUDED.converted_to_invoice_id;
+        `;
+      } catch (err) {
+        // Fallback for tables prior to column addition
+        await sql`
+          INSERT INTO invoices (
+            id, invoice_no, date, customer_id, customer_name, customer_gstin, customer_address,
+            customer_city, customer_state, customer_state_code, customer_mobile, ack_no, ack_date,
+            irn, eway_bill_no, vehicle_no, transport_no, items, total_quantity, total_taxable,
+            total_cgst, total_sgst, total_igst, round_off, grand_total, amount_in_words,
+            payment_status, paid_amount, remaining_amount, due_date, notes, created_at
+          ) VALUES (
+            ${data.id}, ${data.invoiceNo}, ${data.date}, ${data.customerId}, ${data.customerName},
+            ${data.customerGstin || null}, ${data.customerAddress || null}, ${data.customerCity || null},
+            ${data.customerState || null}, ${data.customerStateCode || null}, ${data.customerMobile || null},
+            ${data.ackNo || null}, ${data.ackDate || null}, ${data.irn || null}, ${data.ewayBillNo || null},
+            ${data.vehicleNo || null}, ${data.transportNo || null}, ${JSON.stringify(data.items)},
+            ${data.totalQuantity}, ${data.totalTaxable}, ${data.totalCgst || 0}, ${data.totalSgst || 0},
+            ${data.totalIgst || 0}, ${data.roundOff || 0}, ${data.grandTotal}, ${data.amountInWords},
+            ${data.paymentStatus || 'unpaid'}, ${data.paidAmount || 0}, ${data.remainingAmount || 0},
+            ${data.dueDate || null}, ${data.notes || null}, ${data.createdAt || new Date().toISOString()}
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            invoice_no = EXCLUDED.invoice_no,
+            date = EXCLUDED.date,
+            customer_id = EXCLUDED.customer_id,
+            customer_name = EXCLUDED.customer_name,
+            customer_gstin = EXCLUDED.customer_gstin,
+            customer_address = EXCLUDED.customer_address,
+            customer_city = EXCLUDED.customer_city,
+            customer_state = EXCLUDED.customer_state,
+            customer_state_code = EXCLUDED.customer_state_code,
+            customer_mobile = EXCLUDED.customer_mobile,
+            ack_no = EXCLUDED.ack_no,
+            ack_date = EXCLUDED.ack_date,
+            irn = EXCLUDED.irn,
+            eway_bill_no = EXCLUDED.eway_bill_no,
+            vehicle_no = EXCLUDED.vehicle_no,
+            transport_no = EXCLUDED.transport_no,
+            items = EXCLUDED.items,
+            total_quantity = EXCLUDED.total_quantity,
+            total_taxable = EXCLUDED.total_taxable,
+            total_cgst = EXCLUDED.total_cgst,
+            total_sgst = EXCLUDED.total_sgst,
+            total_igst = EXCLUDED.total_igst,
+            round_off = EXCLUDED.round_off,
+            grand_total = EXCLUDED.grand_total,
+            amount_in_words = EXCLUDED.amount_in_words,
+            payment_status = EXCLUDED.payment_status,
+            paid_amount = EXCLUDED.paid_amount,
+            remaining_amount = EXCLUDED.remaining_amount,
+            due_date = EXCLUDED.due_date,
+            notes = EXCLUDED.notes;
+        `;
+      }
       return NextResponse.json({ success: true });
     }
 

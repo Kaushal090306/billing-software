@@ -156,11 +156,54 @@ export function calculateItemRow(
   };
 }
 
+export function deriveBackwardGstAmounts(
+  finalAmount: number,
+  gstRatePercent: number,
+  isInterstate = false
+) {
+  const fa = Math.max(0, Number(finalAmount) || 0);
+  const gstRate = Math.max(0, Number(gstRatePercent) || 0);
+  if (gstRate === 0) {
+    return {
+      taxableAmount: fa,
+      totalGst: 0,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount: 0,
+      totalAmount: fa,
+    };
+  }
+  const totalGst = Math.round((fa * (gstRate / (100 + gstRate))) * 100) / 100;
+  const taxableAmount = Math.round((fa - totalGst) * 100) / 100;
+  if (isInterstate) {
+    return {
+      taxableAmount,
+      totalGst,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount: totalGst,
+      totalAmount: fa,
+    };
+  } else {
+    const cgstAmount = Math.round((totalGst / 2) * 100) / 100;
+    const sgstAmount = Math.round((totalGst - cgstAmount) * 100) / 100;
+    return {
+      taxableAmount,
+      totalGst,
+      cgstAmount,
+      sgstAmount,
+      igstAmount: 0,
+      totalAmount: fa,
+    };
+  }
+}
+
 export function calculateInvoiceSummary(
   items: Array<{
     quantity: number;
     rate: number;
     gstRate: number;
+    finalAmount?: number;
   }>,
   isInterstate: boolean,
   roundOffMode: "nearest_1" | "nearest_5" | "nearest_10" | "none" = "nearest_1",
@@ -172,24 +215,34 @@ export function calculateInvoiceSummary(
   let totalCgst = 0;
   let totalSgst = 0;
   let totalIgst = 0;
+  let rawTotal = 0;
 
   items.forEach((item) => {
-    const calc = calculateItemRow(
-      item.quantity,
-      item.rate,
-      item.gstRate,
-      isInterstate
-    );
-    totalQty += Number(item.quantity) || 0;
-    totalTaxable += calc.taxableAmount;
-    totalCgst += calc.cgstAmount;
-    totalSgst += calc.sgstAmount;
-    totalIgst += calc.igstAmount;
+    const qty = Number(item.quantity) || 0;
+    const rt = Number(item.rate) || 0;
+    const gstRate = Number(item.gstRate) || 0;
+
+    if (item.finalAmount && Number(item.finalAmount) > 0 && gstRate > 0) {
+      const bwd = deriveBackwardGstAmounts(Number(item.finalAmount), gstRate, isInterstate);
+      totalQty += qty;
+      totalTaxable += bwd.taxableAmount;
+      totalCgst += bwd.cgstAmount;
+      totalSgst += bwd.sgstAmount;
+      totalIgst += bwd.igstAmount;
+      rawTotal += bwd.totalAmount;
+    } else {
+      const calc = calculateItemRow(qty, rt, gstRate, isInterstate);
+      totalQty += qty;
+      totalTaxable += calc.taxableAmount;
+      totalCgst += calc.cgstAmount;
+      totalSgst += calc.sgstAmount;
+      totalIgst += calc.igstAmount;
+      rawTotal += calc.totalAmount;
+    }
   });
 
   const disc = Math.max(0, Number(discount) || 0);
-  const totalGst = isInterstate ? totalIgst : totalCgst + totalSgst;
-  const rawTotal = Math.max(0, totalTaxable + totalGst - disc);
+  rawTotal = Math.max(0, rawTotal - disc);
 
   let finalTotal = rawTotal;
   let roundOff = 0;
