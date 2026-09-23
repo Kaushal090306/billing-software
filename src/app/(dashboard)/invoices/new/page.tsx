@@ -64,7 +64,9 @@ function NewInvoiceContent() {
   const duplicateFromId = searchParams.get("duplicateFrom");
   const preselectedCustomerId = searchParams.get("customerId");
   const convertRawBillIdsParam = searchParams.get("convertRawBills");
-  const initialBillType = searchParams.get("billType") === "raw" ? "raw" : "gst";
+  const rawParam =
+    searchParams.get("billType") === "raw" || searchParams.get("type") === "raw";
+  const initialBillType: "gst" | "raw" = rawParam ? "raw" : "gst";
 
   const { setOpen } = useSidebar();
 
@@ -264,8 +266,28 @@ function NewInvoiceContent() {
     const yyyy = today.getFullYear();
     setInvoiceDate(`${dd}/${mm}/${yyyy}`);
 
-    // Generate Next Invoice Number
-    if (billType === "raw") {
+    // Generate Next Invoice Number based on effective bill type
+    const isTargetRaw = rawParam && !convertRawBillIdsParam;
+    if (isTargetRaw) {
+      setBillType("raw");
+      const rawCount = loadedInvoices.filter((i) => i.billType === "raw").length;
+      setInvoiceNo(`RAW/${rawCount + 101}`);
+      setItems((prev) =>
+        prev.map((it) => ({
+          ...it,
+          gstRate: 0,
+        }))
+      );
+    } else if (convertRawBillIdsParam) {
+      setBillType("gst");
+      const lastGstInv = loadedInvoices.find((i) => i.billType !== "raw")?.invoiceNo || "MTJ/144";
+      const nextNo = generateNextInvoiceNumber(
+        lastGstInv,
+        loadedSettings.invoicePrefix || "MTJ",
+        loadedSettings.financialYear || "2026-27"
+      );
+      setInvoiceNo(nextNo);
+    } else if (billType === "raw") {
       const rawCount = loadedInvoices.filter((i) => i.billType === "raw").length;
       setInvoiceNo(`RAW/${rawCount + 101}`);
     } else {
@@ -427,7 +449,7 @@ function NewInvoiceContent() {
       unsubscribe();
       window.removeEventListener("focus", refreshData);
     };
-  }, [duplicateFromId, preselectedCustomerId, convertRawBillIdsParam]);
+  }, [duplicateFromId, preselectedCustomerId, convertRawBillIdsParam, rawParam]);
 
 
   // Handle Customer Selection & Auto-fill
@@ -814,19 +836,16 @@ function NewInvoiceContent() {
 
     return {
       id: "live_preview_invoice",
-      invoiceNo: invoiceNo.trim().toUpperCase() || "MTJ/145",
-      date: invoiceDate.trim() || "15/09/2026",
-      customerId: selectedCustomerId || "cust_1",
-      customerName:
-        customerName.trim().toUpperCase() || "SHREE MANGALAM THREAD & JARI",
-      customerGstin: customerGstin.trim().toUpperCase() || "24AEYPV3370E1Z1",
-      customerAddress:
-        customerAddress.trim().toUpperCase() ||
-        "SHOP NO.1,JAY NARAYAN IND.-1,ANJANA FARM,SURAT",
+      invoiceNo: invoiceNo.trim().toUpperCase() || "MTJ/101",
+      date: invoiceDate.trim() || new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      customerId: selectedCustomerId || "",
+      customerName: customerName.trim().toUpperCase(),
+      customerGstin: customerGstin.trim().toUpperCase(),
+      customerAddress: customerAddress.trim().toUpperCase(),
       customerCity: customerCity.trim().toUpperCase() || "SURAT",
       customerState: customerState.trim() || "Gujarat",
       customerStateCode: customerStateCode.trim() || "24",
-      customerMobile: customerMobile.trim() || "9723544545",
+      customerMobile: customerMobile.trim(),
 
       ewayBillNo: ewayBillNo.trim(),
       vehicleNo: vehicleNo.trim(),
@@ -1279,10 +1298,29 @@ function NewInvoiceContent() {
                   onClick={() => {
                     setBillType("gst");
                     setItems((prev) =>
-                      prev.map((it) => ({
-                        ...it,
-                        gstRate: it.gstRate === 0 ? 5 : it.gstRate,
-                      }))
+                      prev.map((it) => {
+                        const prod = products.find(
+                          (p) =>
+                            p.id === it.productId ||
+                            p.name.toUpperCase() === it.productName.toUpperCase()
+                        );
+                        const catalogGst = prod ? prod.gstRate : 5;
+                        const qNum = Number(it.quantity) || 0;
+                        const pppNum = Number(it.pricePerPiece) || 0;
+                        const rNum = Number(it.rate) || 0;
+                        const faNum = Number(it.finalAmount) || 0;
+                        let newRate = rNum;
+                        if (pppNum > 0) {
+                          newRate = pppNum / (1 + catalogGst / 100);
+                        } else if (faNum > 0 && qNum > 0) {
+                          newRate = (faNum / (1 + catalogGst / 100)) / qNum;
+                        }
+                        return {
+                          ...it,
+                          gstRate: catalogGst,
+                          rate: newRate > 0 ? (newRate % 1 === 0 ? String(newRate) : newRate.toFixed(4)) : it.rate,
+                        };
+                      })
                     );
                     const lastGst = invoices.find((i) => i.billType !== "raw")?.invoiceNo || "MTJ/144";
                     setInvoiceNo(
@@ -1292,6 +1330,7 @@ function NewInvoiceContent() {
                         settings.financialYear || "2026-27"
                       )
                     );
+                    toast.info("Switched to Official GST Tax Invoice (GST applied)");
                   }}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                     billType === "gst"
@@ -1308,23 +1347,35 @@ function NewInvoiceContent() {
                     setItems((prev) =>
                       prev.map((it) => {
                         const qNum = Number(it.quantity) || 0;
+                        const pppNum = Number(it.pricePerPiece) || 0;
+                        const rNum = Number(it.rate) || 0;
                         const faNum = Number(it.finalAmount) || 0;
-                        const rNum =
-                          faNum > 0 && qNum > 0
-                            ? (faNum / qNum).toFixed(2)
-                            : it.rate
-                            ? String(it.rate)
-                            : "";
+                        const unitRate =
+                          pppNum > 0
+                            ? pppNum
+                            : rNum > 0
+                            ? rNum
+                            : qNum > 0 && faNum > 0
+                            ? faNum / qNum
+                            : 0;
+                        const finalAmt =
+                          faNum > 0
+                            ? faNum
+                            : qNum > 0 && unitRate > 0
+                            ? qNum * unitRate
+                            : 0;
                         return {
                           ...it,
                           gstRate: 0,
-                          rate: rNum,
-                          pricePerPiece: rNum,
+                          rate: unitRate > 0 ? (unitRate % 1 === 0 ? String(unitRate) : unitRate.toFixed(2)) : it.rate,
+                          pricePerPiece: unitRate > 0 ? (unitRate % 1 === 0 ? String(unitRate) : unitRate.toFixed(2)) : it.pricePerPiece,
+                          finalAmount: finalAmt > 0 ? finalAmt.toFixed(2) : it.finalAmount,
                         };
                       })
                     );
                     const rawCount = invoices.filter((i) => i.billType === "raw").length;
                     setInvoiceNo(`RAW/${rawCount + 101}`);
+                    toast.info("Switched to Raw Bill (0% GST - Non-taxable delivery slip)");
                   }}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                     billType === "raw"

@@ -204,7 +204,7 @@ export default function InvoicesPage() {
             variant="outline"
             className="h-10 px-3.5 rounded-md border-amber-300 dark:border-amber-700/60 bg-amber-50/50 hover:bg-amber-100/70 dark:bg-amber-950/30 dark:hover:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-semibold text-xs sm:text-sm"
           >
-            <Link href="/invoices/new?type=raw" className="flex items-center gap-1.5">
+            <Link href="/invoices/new?billType=raw" className="flex items-center gap-1.5">
               <Plus className="h-4 w-4" />
               <span>New Raw Bill</span>
             </Link>

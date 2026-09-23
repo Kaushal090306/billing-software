@@ -262,14 +262,26 @@ export default function CustomerProfilePage() {
   }, [invoices, billTypeTab, gstInvoices, rawInvoices]);
 
   const selectableInvoices = useMemo(() => {
-    return filteredInvoices.filter((i) => i.billType === "raw");
+    return filteredInvoices.filter(
+      (i) => i.billType === "raw" && !i.convertedToInvoiceId
+    );
   }, [filteredInvoices]);
 
-  const selectedRawBillsTotal = useMemo(() => {
-    return selectedRawBillIds.reduce((sum, id) => {
+  const selectedRawBillsStats = useMemo(() => {
+    let totalQty = 0;
+    let totalAmt = 0;
+    selectedRawBillIds.forEach((id) => {
       const inv = invoices.find((i) => i.id === id);
-      return sum + (inv ? Number(inv.grandTotal) : 0);
-    }, 0);
+      if (inv) {
+        totalQty += Number(inv.totalQuantity) || 0;
+        totalAmt += Number(inv.grandTotal) || 0;
+      }
+    });
+    return {
+      count: selectedRawBillIds.length,
+      totalQty: Math.round(totalQty * 1000) / 1000,
+      totalAmt: Math.round(totalAmt * 100) / 100,
+    };
   }, [selectedRawBillIds, invoices]);
 
   // Combined Ledger Timeline with Running Balance Calculation
@@ -516,36 +528,45 @@ export default function CustomerProfilePage() {
         <TabsContent value="invoices" className="space-y-4">
           {/* Multi-Select Conversion Banner for Raw Bills */}
           {selectedRawBillIds.length > 0 && (
-            <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-2 text-xs">
-                <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                <span className="font-semibold text-foreground">
-                  {selectedRawBillIds.length} Raw Bills selected (Combined Total:{" "}
-                  <strong className="text-purple-700 dark:text-purple-300 font-mono text-sm">
-                    {formatINR(selectedRawBillsTotal)}
-                  </strong>
-                  )
-                </span>
+            <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 dark:from-purple-950/60 dark:via-indigo-950/40 dark:to-purple-950/60 border-2 border-purple-300 dark:border-purple-700 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md animate-in fade-in">
+              <div className="flex items-center gap-3 text-xs">
+                <div className="h-8 w-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                  {selectedRawBillIds.length}
+                </div>
+                <div>
+                  <span className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                    <span>{selectedRawBillIds.length} Raw Bill{selectedRawBillIds.length > 1 ? "s" : ""} Selected</span>
+                    <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-200 border-purple-300 text-[10px] py-0 px-1.5 font-semibold">
+                      Ready for GST Conversion
+                    </Badge>
+                  </span>
+                  <div className="text-muted-foreground text-xs mt-0.5 flex items-center gap-2">
+                    <span>Total Weight: <strong className="font-mono text-foreground font-semibold">{formatNumber(selectedRawBillsStats.totalQty, 3)} KG</strong></span>
+                    <span>&bull;</span>
+                    <span>Total Value: <strong className="text-purple-700 dark:text-purple-300 font-mono text-sm font-bold">{formatINR(selectedRawBillsStats.totalAmt)}</strong></span>
+                  </div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => setSelectedRawBillIds([])}
-                  className="h-8 text-xs text-muted-foreground"
+                  className="h-8 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   Clear Selection
                 </Button>
                 <Button
                   asChild
                   size="sm"
-                  className="h-8 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-md shadow-xs"
+                  className="h-9 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs rounded-lg shadow-md cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all"
                 >
                   <Link
                     href={`/invoices/new?customerId=${customer.id}&convertRawBills=${selectedRawBillIds.join(
                       ","
                     )}`}
                   >
+                    <FileText className="h-4 w-4 mr-1.5" />
                     <span>Create GST Bill from Selected ({selectedRawBillIds.length})</span>
                   </Link>
                 </Button>
@@ -628,7 +649,7 @@ export default function CustomerProfilePage() {
                         {selectableInvoices.length > 0 && (
                           <input
                             type="checkbox"
-                            title="Select all raw bills to convert to GST Bill"
+                            title="Select all pending raw bills to convert to GST Bill"
                             checked={
                               selectableInvoices.length > 0 &&
                               selectableInvoices.every((i) =>
@@ -650,7 +671,7 @@ export default function CustomerProfilePage() {
                                 );
                               }
                             }}
-                            className="rounded cursor-pointer"
+                            className="rounded cursor-pointer h-4 w-4 accent-purple-600"
                           />
                         )}
                       </th>
@@ -687,7 +708,12 @@ export default function CustomerProfilePage() {
                               {isRaw && (
                                 <input
                                   type="checkbox"
-                                  title="Select this raw bill to generate GST Bill"
+                                  title={
+                                    isConverted
+                                      ? "Already converted to GST Bill"
+                                      : "Select this raw bill to generate GST Bill"
+                                  }
+                                  disabled={isConverted}
                                   checked={isSelected}
                                   onChange={(e) => {
                                     if (e.target.checked) {
@@ -698,7 +724,11 @@ export default function CustomerProfilePage() {
                                       );
                                     }
                                   }}
-                                  className="rounded cursor-pointer"
+                                  className={`rounded h-4 w-4 accent-purple-600 ${
+                                    isConverted
+                                      ? "opacity-30 cursor-not-allowed"
+                                      : "cursor-pointer"
+                                  }`}
                                 />
                               )}
                             </td>
@@ -782,7 +812,7 @@ export default function CustomerProfilePage() {
                             </td>
                             <td className="p-3 text-right">
                               <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                {isRaw && (
+                                {isRaw && !isConverted && (
                                   <Button
                                     asChild
                                     size="sm"

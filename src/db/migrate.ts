@@ -237,29 +237,9 @@ export async function runMigration() {
       `;
     }
 
-    // Seed Customers
-    const existingCustomers = await sql`SELECT count(*) FROM customers;`;
-    if (Number(existingCustomers[0]?.count || 0) === 0) {
-      console.log(`Seeding ${defaultCustomers.length} default customers...`);
-      for (const cust of defaultCustomers) {
-        await sql`
-          INSERT INTO customers (
-            id, business_name, contact_person, gstin, pan, address, city, state, state_code,
-            pincode, mobile, email, opening_balance, current_balance, notes, created_at
-          ) VALUES (
-            ${cust.id}, ${cust.businessName}, ${cust.contactPerson || null}, ${cust.gstin || null},
-            ${cust.pan || null}, ${cust.address || null}, ${cust.city || 'Surat'}, ${cust.state || 'Gujarat'},
-            ${cust.stateCode || '24'}, ${cust.pincode || null}, ${cust.mobile}, ${cust.email || null},
-            ${cust.openingBalance}, ${cust.currentBalance}, ${cust.notes || null}, ${cust.createdAt}
-          )
-          ON CONFLICT (id) DO NOTHING;
-        `;
-      }
-    }
-
-    // Seed Products
+    // Seed Products if catalog is empty
     const existingProducts = await sql`SELECT count(*) FROM products;`;
-    if (Number(existingProducts[0]?.count || 0) === 0) {
+    if (Number(existingProducts[0]?.count || 0) === 0 && defaultProducts.length > 0) {
       console.log(`Seeding ${defaultProducts.length} default products...`);
       for (const prod of defaultProducts) {
         await sql`
@@ -269,70 +249,6 @@ export async function runMigration() {
             ${prod.id}, ${prod.name}, ${prod.hsn}, ${prod.unit}, ${prod.defaultRate},
             ${prod.gstRate}, ${prod.stock}, ${prod.category}, ${prod.description || null},
             ${new Date().toISOString()}
-          )
-          ON CONFLICT (id) DO NOTHING;
-        `;
-      }
-    }
-
-    // Seed Invoices
-    const existingInvoices = await sql`SELECT count(*) FROM invoices;`;
-    if (Number(existingInvoices[0]?.count || 0) === 0) {
-      console.log(`Seeding ${defaultInvoices.length} default invoices...`);
-      for (const inv of defaultInvoices) {
-        await sql`
-          INSERT INTO invoices (
-            id, invoice_no, date, customer_id, customer_name, customer_gstin, customer_address,
-            customer_city, customer_state, customer_state_code, customer_mobile, ack_no, ack_date,
-            irn, eway_bill_no, vehicle_no, transport_no, items, total_quantity, total_taxable,
-            total_cgst, total_sgst, total_igst, round_off, grand_total, amount_in_words,
-            payment_status, paid_amount, remaining_amount, due_date, notes, created_at
-          ) VALUES (
-            ${inv.id}, ${inv.invoiceNo}, ${inv.date}, ${inv.customerId}, ${inv.customerName},
-            ${inv.customerGstin || null}, ${inv.customerAddress || null}, ${inv.customerCity || null},
-            ${inv.customerState || null}, ${inv.customerStateCode || null}, ${inv.customerMobile || null},
-            ${inv.ackNo || null}, ${inv.ackDate || null}, ${inv.irn || null}, ${inv.ewayBillNo || null},
-            ${inv.vehicleNo || null}, ${inv.transportNo || null}, ${JSON.stringify(inv.items)},
-            ${inv.totalQuantity}, ${inv.totalTaxable}, ${inv.totalCgst}, ${inv.totalSgst},
-            ${inv.totalIgst}, ${inv.roundOff}, ${inv.grandTotal}, ${inv.amountInWords},
-            ${inv.paymentStatus}, ${inv.paidAmount}, ${inv.remainingAmount}, ${inv.dueDate || null},
-            ${inv.notes || null}, ${inv.createdAt}
-          )
-          ON CONFLICT (id) DO NOTHING;
-        `;
-      }
-    }
-
-    // Seed Customer Rates
-    const existingRates = await sql`SELECT count(*) FROM customer_rates;`;
-    if (Number(existingRates[0]?.count || 0) === 0) {
-      console.log(`Seeding ${defaultCustomerRates.length} default customer rates...`);
-      for (const rate of defaultCustomerRates) {
-        await sql`
-          INSERT INTO customer_rates (
-            id, customer_id, product_id, last_rate, last_billed_date, invoice_no
-          ) VALUES (
-            ${rate.id}, ${rate.customerId}, ${rate.productId}, ${rate.lastRate},
-            ${rate.lastBilledDate}, ${rate.invoiceNo}
-          )
-          ON CONFLICT (id) DO NOTHING;
-        `;
-      }
-    }
-
-    // Seed Payments
-    const existingPayments = await sql`SELECT count(*) FROM payments;`;
-    if (Number(existingPayments[0]?.count || 0) === 0) {
-      console.log(`Seeding ${defaultPayments.length} default payments...`);
-      for (const pay of defaultPayments) {
-        await sql`
-          INSERT INTO payments (
-            id, invoice_id, invoice_no, customer_id, customer_name, amount, payment_mode,
-            reference_no, payment_date, notes, created_at
-          ) VALUES (
-            ${pay.id}, ${pay.invoiceId || null}, ${pay.invoiceNo || null}, ${pay.customerId},
-            ${pay.customerName}, ${pay.amount}, ${pay.paymentMode}, ${pay.referenceNo || null},
-            ${pay.paymentDate}, ${pay.notes || null}, ${pay.createdAt}
           )
           ON CONFLICT (id) DO NOTHING;
         `;

@@ -214,14 +214,25 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10 flex flex-wrap items-center gap-2.5">
+          <Button
+            asChild
+            variant="outline"
+            className="h-10 px-4 rounded-md border-amber-300 dark:border-amber-600 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all text-xs sm:text-sm"
+          >
+            <Link href="/invoices/new?billType=raw" className="flex items-center gap-1.5">
+              <Plus className="h-4 w-4 text-amber-400" />
+              <span>New Raw Bill</span>
+            </Link>
+          </Button>
+
           <Button
             asChild
             className="h-10 px-5 rounded-md bg-white text-zinc-900 hover:bg-purple-50 font-semibold shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all text-xs sm:text-sm"
           >
             <Link href="/invoices/new" className="flex items-center gap-2">
               <Plus className="h-4 w-4 text-purple-600" />
-              <span>Create New Bill</span>
+              <span>Create GST Bill</span>
             </Link>
           </Button>
         </div>

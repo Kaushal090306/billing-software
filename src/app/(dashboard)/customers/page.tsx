@@ -425,15 +425,30 @@ export default function CustomersPage() {
                               </Link>
                             </Button>
 
-                            {/* Create Bill for this Customer */}
+                            {/* Create Raw Bill for this Customer */}
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2 text-xs font-semibold border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-md"
+                              title="Create Non-GST Raw Bill"
+                            >
+                              <Link href={`/invoices/new?customerId=${cust.id}&billType=raw`}>
+                                <Plus className="h-3 w-3 mr-0.5" />
+                                <span>Raw</span>
+                              </Link>
+                            </Button>
+
+                            {/* Create GST Bill for this Customer */}
                             <Button
                               asChild
                               size="sm"
                               className="h-8 px-2 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-md shadow-xs"
+                              title="Create Official GST Tax Invoice"
                             >
                               <Link href={`/invoices/new?customerId=${cust.id}`}>
-                                <Plus className="h-3 w-3 mr-1" />
-                                <span>Bill</span>
+                                <Plus className="h-3 w-3 mr-0.5" />
+                                <span>GST</span>
                               </Link>
                             </Button>
 
