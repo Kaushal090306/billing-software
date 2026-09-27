@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/db";
 import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import chromium from "@sparticuz/chromium-min";
 import fs from "fs";
 import path from "path";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const CHROMIUM_PACK_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar";
 
 const GST_STATE_MAP: Record<string, string> = {
   "01": "Jammu and Kashmir",
@@ -118,28 +123,38 @@ async function getSharedBrowser() {
       });
       return globalThis.__gstSharedBrowser;
     } catch (e) {
-      console.warn("Local Chrome launch failed, falling back to bundled chromium...", e);
+      console.warn("Local Chrome launch failed, falling back to serverless chromium...", e);
     }
   }
 
-  // 2. Try @sparticuz/chromium on Cloud / Vercel / AWS Lambda / Serverless
+  // 2. Try @sparticuz/chromium-min on Cloud / Vercel / AWS Lambda / Serverless
   try {
-    const execPath = await chromium.executablePath();
+    chromium.setGraphicsMode = false;
+    let execPath: string | null = null;
+    try {
+      execPath = await chromium.executablePath(CHROMIUM_PACK_URL);
+    } catch (e) {
+      execPath = await chromium.executablePath();
+    }
+
     if (execPath) {
       globalThis.__gstSharedBrowser = await puppeteer.launch({
         executablePath: execPath,
-        args: chromium.args || [
+        args: [
+          ...(chromium.args || []),
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--single-process",
+          "--no-zygote",
         ],
         headless: true,
       });
       return globalThis.__gstSharedBrowser;
     }
   } catch (cloudErr) {
-    console.warn("Sparticuz chromium launch failed:", cloudErr);
+    console.error("Serverless chromium launch error:", cloudErr);
   }
 
   return null;

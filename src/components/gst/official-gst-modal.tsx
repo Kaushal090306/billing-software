@@ -59,11 +59,10 @@ export function OfficialGstModal({
   const [isLoadingCaptcha, setIsLoadingCaptcha] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isCloudMode, setIsCloudMode] = useState(false);
+  const [showPasteBox, setShowPasteBox] = useState(false);
   const [pastedText, setPastedText] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const pasteAreaRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync GSTIN when prop changes or modal opens
   useEffect(() => {
@@ -76,24 +75,20 @@ export function OfficialGstModal({
       setSessionId(null);
       setCaptchaCode("");
       setErrorMessage(null);
-      setIsCloudMode(false);
+      setShowPasteBox(false);
       setPastedText("");
     }
   }, [isOpen, gstin]);
 
-  // Focus input when captcha appears or paste area in cloud mode
+  // Focus input when captcha appears
   useEffect(() => {
     if (captchaImage && inputRef.current) {
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
       }, 80);
-    } else if (isCloudMode && pasteAreaRef.current) {
-      setTimeout(() => {
-        pasteAreaRef.current?.focus();
-      }, 100);
     }
-  }, [captchaImage, isCloudMode]);
+  }, [captchaImage]);
 
   const handleInitCaptcha = async (gstToUse: string) => {
     setIsLoadingCaptcha(true);
@@ -101,7 +96,6 @@ export function OfficialGstModal({
     setSessionId(null);
     setErrorMessage(null);
     setCaptchaCode("");
-    setIsCloudMode(false);
     try {
       const res = await fetch("/api/gst-lookup", {
         method: "POST",
@@ -121,16 +115,11 @@ export function OfficialGstModal({
       if (data.success && data.requiresCaptcha && data.captchaImage) {
         setCaptchaImage(data.captchaImage);
         setSessionId(data.sessionId);
-        setIsCloudMode(false);
       } else {
-        setIsCloudMode(true);
-        if (data.error && !data.isCloudMode) {
-          setErrorMessage(data.error);
-        }
+        setErrorMessage(data.error || "Failed to fetch captcha from official portal. Click retry.");
       }
     } catch (err: any) {
-      setIsCloudMode(true);
-      setErrorMessage("Live cloud environment: Use 1-Click Portal Copy & Instant Paste below.");
+      setErrorMessage(err.message || "Failed to initialize official portal verification.");
     } finally {
       setIsLoadingCaptcha(false);
     }
@@ -198,6 +187,8 @@ export function OfficialGstModal({
         setErrorMessage(data.error || "Incorrect captcha. Please re-enter.");
         if (data.captchaImage) {
           setCaptchaImage(data.captchaImage);
+        } else if (data.error?.toLowerCase().includes("expired") || data.error?.toLowerCase().includes("session")) {
+          handleInitCaptcha(cleanGstin);
         }
         setCaptchaCode("");
         setTimeout(() => inputRef.current?.focus(), 150);
@@ -227,15 +218,16 @@ export function OfficialGstModal({
     window.open("https://services.gst.gov.in/services/searchtp", "_blank", "noopener,noreferrer");
   };
 
-  const handleParseTextDirect = async (textToParse: string) => {
-    const raw = textToParse.trim();
-    if (!raw) return;
-    setIsVerifying(true);
+  const handleParsePastedText = async () => {
+    if (!pastedText.trim()) {
+      toast.error("Please paste text from official portal");
+      return;
+    }
     try {
       const res = await fetch("/api/gst-lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "parse_text", rawText: raw, gstin: cleanGstin }),
+        body: JSON.stringify({ action: "parse_text", rawText: pastedText, gstin: cleanGstin }),
       });
       const data = await res.json();
       if (data.success && data.verified) {
@@ -243,28 +235,10 @@ export function OfficialGstModal({
         toast.success(`✓ Official Details Extracted: ${data.tradeName || data.businessName || data.gstin}`);
         onClose();
       } else {
-        toast.error(data.error || "Could not parse GST details from pasted text. Please paste the full table.");
+        toast.error(data.error || "Could not parse GST data from text");
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to process pasted text");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleClipboardRead = async () => {
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text && text.trim()) {
-          setPastedText(text);
-          handleParseTextDirect(text);
-          return;
-        }
-      }
-      toast.error("Please paste directly into the box using Ctrl+V");
-    } catch {
-      toast.error("Clipboard permission not granted. Please press Ctrl+V into the box.");
+      toast.error(err.message || "Failed to process text");
     }
   };
 
@@ -316,13 +290,13 @@ export function OfficialGstModal({
                 Connecting to Official GST Portal...
               </div>
               <div className="text-[11px] text-muted-foreground">
-                Connecting to services.gst.gov.in
+                Fetching live security challenge from services.gst.gov.in
               </div>
             </div>
           )}
 
-          {/* 1. Live Captcha Entry Box (When browser automation is active) */}
-          {!isLoadingCaptcha && captchaImage && !isCloudMode && (
+          {/* 1. Live Captcha Entry Box */}
+          {!isLoadingCaptcha && captchaImage && (
             <div className="p-3.5 bg-purple-50/50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">
@@ -395,97 +369,75 @@ export function OfficialGstModal({
             </div>
           )}
 
-          {/* 2. Cloud Mode / 1-Click Assisted Flow (When running in serverless cloud or browser is not on host) */}
-          {!isLoadingCaptcha && (!captchaImage || isCloudMode) && (
+          {/* 2. Error Fallback (Retry Live Fetch) */}
+          {!isLoadingCaptcha && !captchaImage && errorMessage && (
             <div className="space-y-3">
-              {/* Step 1: Open Portal */}
-              <div className="p-3.5 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/30 rounded-xl border border-purple-200 dark:border-purple-800/80 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4 text-purple-600" />
-                    <span>Live Verification from Official Portal</span>
-                  </span>
-                  <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-[10px] font-semibold border-0">
-                    1-Click
-                  </Badge>
+              <div className="p-3 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-600 dark:text-red-300 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Could Not Fetch Captcha Automatically</span>
                 </div>
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Click below to copy <strong className="font-mono text-purple-900 dark:text-purple-300 font-bold">{cleanGstin}</strong> and open the official portal.
-                </p>
-                <Button
-                  type="button"
-                  onClick={handleOpenOfficialSite}
-                  className="w-full h-10 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs gap-2 shadow-xs cursor-pointer"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  <span>1. Open Official GST Portal (GSTIN Copied)</span>
-                </Button>
+                <p className="text-[11px]">{errorMessage}</p>
               </div>
 
-              {/* Step 2: Instant Auto-Extract & Paste Area */}
-              <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-border space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <ClipboardPaste className="h-4 w-4 text-purple-600" />
-                    <span>2. Paste Portal Result Here</span>
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClipboardRead}
-                    className="h-7 px-2.5 text-[11px] font-semibold border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer"
-                  >
-                    <ClipboardPaste className="h-3 w-3 mr-1" />
-                    <span>Paste Clipboard</span>
-                  </Button>
-                </div>
-
-                <textarea
-                  ref={pasteAreaRef}
-                  rows={2}
-                  value={pastedText}
-                  onChange={(e) => {
-                    setPastedText(e.target.value);
-                    if (e.target.value.length > 20) {
-                      handleParseTextDirect(e.target.value);
-                    }
-                  }}
-                  onPaste={(e) => {
-                    const text = e.clipboardData.getData("text");
-                    if (text) {
-                      setPastedText(text);
-                      handleParseTextDirect(text);
-                    }
-                  }}
-                  placeholder="Copy text from official portal & press Ctrl+V here..."
-                  className="w-full text-xs font-mono p-2.5 border rounded-lg bg-white dark:bg-zinc-900 border-purple-200 dark:border-purple-800 outline-none focus:ring-2 focus:ring-purple-500 resize-none placeholder:text-muted-foreground/60"
-                  autoFocus
-                />
-
-                <div className="flex items-center justify-between text-[10.5px]">
-                  <span className="text-muted-foreground italic">
-                    * Instantly auto-fills Trade Name, Legal Name &amp; Address.
-                  </span>
-                  {pastedText.trim() && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => handleParseTextDirect(pastedText)}
-                      disabled={isVerifying}
-                      className="h-7 px-3 text-xs bg-purple-600 text-white font-semibold cursor-pointer"
-                    >
-                      {isVerifying ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        "Extract Now"
-                      )}
-                    </Button>
-                  )}
-                </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={() => handleInitCaptcha(cleanGstin)}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold cursor-pointer"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  <span>Retry Live Fetch</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenOfficialSite}
+                  className="flex-1 text-xs font-semibold cursor-pointer"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                  <span>Open Portal</span>
+                </Button>
               </div>
             </div>
           )}
+
+          {/* Quick Paste Alternate Option (Collapsible) */}
+          <div className="border-t border-border pt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowPasteBox(!showPasteBox)}
+              className="text-[11px] text-muted-foreground hover:text-purple-600 font-medium flex items-center justify-between w-full cursor-pointer"
+            >
+              <span>Or paste details directly from browser window:</span>
+              <span className="text-purple-600 font-semibold">
+                {showPasteBox ? "Hide" : "Paste Tool"}
+              </span>
+            </button>
+
+            {showPasteBox && (
+              <div className="mt-2 space-y-2 p-2.5 rounded bg-zinc-50 dark:bg-zinc-800/60 border border-border">
+                <textarea
+                  rows={2}
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  placeholder="Paste copied table text from services.gst.gov.in..."
+                  className="w-full text-xs font-mono p-2 border rounded bg-white dark:bg-zinc-900 outline-none resize-none"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleParsePastedText}
+                    disabled={!pastedText.trim()}
+                    className="h-7 text-xs bg-purple-600 text-white cursor-pointer"
+                  >
+                    Extract &amp; Fill
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
