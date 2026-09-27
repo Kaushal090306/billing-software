@@ -148,6 +148,8 @@ async function getSharedBrowser() {
           "--disable-gpu",
           "--single-process",
           "--no-zygote",
+          "--disable-blink-features=AutomationControlled",
+          "--window-size=1280,800",
         ],
         headless: true,
       });
@@ -659,34 +661,20 @@ export async function POST(req: Request) {
       }
 
       const page = await browser.newPage();
+      await page.setViewport({ width: 1280, height: 800 });
       await page.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
       );
 
-      // Block unneeded assets (fonts, non-captcha images, trackers) for ultra-fast loading
-      await page.setRequestInterception(true);
-      page.on("request", (req) => {
-        const resourceType = req.resourceType();
-        const url = req.url();
-        if (
-          resourceType === "font" ||
-          resourceType === "media" ||
-          (resourceType === "image" && !url.includes("captcha") && !url.includes("data:image")) ||
-          url.includes("google-analytics") ||
-          url.includes("googletagmanager")
-        ) {
-          req.abort();
-        } else {
-          req.continue();
-        }
+      // Stealth evasion to bypass F5 BIG-IP / bot defense
+      await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+        (window as any).chrome = { runtime: {} };
+        Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en", "gu", "hi"] });
+        Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
       });
 
       try {
-        await page.goto("https://services.gst.gov.in/services/searchtp", {
-          waitUntil: "domcontentloaded",
-          timeout: 25000,
-        });
-
         // Attach response listener to capture official JSON response from GSTN server
         let capturedApiData: any = null;
         page.on("response", async (resp) => {
@@ -704,18 +692,47 @@ export async function POST(req: Request) {
           } catch {}
         });
 
-        await page.waitForSelector("#for_gstin", { timeout: 20000 });
-        await page.type("#for_gstin", cleanGstin);
-        await page.waitForSelector("img[src*='captcha']", { timeout: 20000 });
+        await page.goto("https://services.gst.gov.in/services/searchtp", {
+          waitUntil: "networkidle2",
+          timeout: 30000,
+        });
 
-        const captchaEl = await page.$("img[src*='captcha']");
+        // Wait for GSTIN input field with multiple fallbacks
+        let gstinInput = await page.waitForSelector("#for_gstin, input[name='gstin'], input[id*='gstin'], input[ng-model*='gstin']", {
+          timeout: 20000,
+        }).catch(() => null);
+
+        if (!gstinInput) {
+          // If not found, wait a few seconds in case F5 security challenge is redirecting
+          await new Promise((r) => setTimeout(r, 2500));
+          gstinInput = await page.waitForSelector("#for_gstin, input[name='gstin'], input[id*='gstin'], input[ng-model*='gstin']", {
+            timeout: 10000,
+          }).catch(() => null);
+        }
+
+        if (!gstinInput) {
+          throw new Error("GST portal search input could not be loaded. Please retry or use 1-Click Paste Tool.");
+        }
+
+        // Type GSTIN into input field
+        await gstinInput.click({ clickCount: 3 }).catch(() => {});
+        await gstinInput.type(cleanGstin);
+
+        // Wait for captcha image to render
+        const captchaEl = await page.waitForSelector("img[src*='captcha'], #imgCaptcha, .captcha-img", {
+          timeout: 20000,
+        }).catch(() => null);
+
         if (!captchaEl) {
           await page.close().catch(() => {});
           return NextResponse.json(
-            { success: false, error: "Failed to load GST portal captcha." },
+            { success: false, error: "Failed to load GST portal captcha. Please retry." },
             { status: 500 }
           );
         }
+
+        // Allow captcha image to paint completely
+        await new Promise((r) => setTimeout(r, 300));
 
         const base64Img = await captchaEl.screenshot({ encoding: "base64" });
         const sessionId = `gst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -769,11 +786,22 @@ export async function POST(req: Request) {
 
       try {
         // Clear and type captcha
-        await page.click("#fo-captcha", { clickCount: 3 });
-        await page.type("#fo-captcha", String(captchaCode).trim());
+        const captchaInput = await page.$("#fo-captcha, input[name='captcha'], input[id*='captcha'], input[ng-model*='captcha']");
+        if (captchaInput) {
+          await captchaInput.click({ clickCount: 3 }).catch(() => {});
+          await captchaInput.type(String(captchaCode).trim());
+        } else {
+          await page.click("#fo-captcha", { clickCount: 3 }).catch(() => {});
+          await page.type("#fo-captcha", String(captchaCode).trim());
+        }
 
         // Click search button
-        await page.click("#lotsearch");
+        const searchBtn = await page.$("#lotsearch, button[type='submit'], button[data-ng-click*='search'], button.btn-primary");
+        if (searchBtn) {
+          await searchBtn.click();
+        } else {
+          await page.click("#lotsearch");
+        }
 
         // Wait for real taxpayer result data or error message with fast 80ms polling
         await page.waitForFunction(
