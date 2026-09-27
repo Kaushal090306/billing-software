@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/db";
 import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 import fs from "fs";
 import path from "path";
 
@@ -93,32 +94,55 @@ async function getSharedBrowser() {
   if (globalThis.__gstSharedBrowser && isBrowserAlive(globalThis.__gstSharedBrowser)) {
     return globalThis.__gstSharedBrowser;
   }
-  const chromePath = getChromePath();
-  if (!chromePath) return null;
 
-  try {
-    globalThis.__gstSharedBrowser = await puppeteer.launch({
-      executablePath: chromePath,
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-zygote",
-        "--no-first-run",
-        "--disable-extensions",
-        "--disable-default-apps",
-        "--mute-audio",
-        "--disable-background-networking",
-        "--window-size=1024,768",
-      ],
-    });
-    return globalThis.__gstSharedBrowser;
-  } catch (e) {
-    console.error("Shared browser launch error:", e);
-    return null;
+  // 1. Try local Chrome path first (Windows, Linux, macOS)
+  const chromePath = getChromePath();
+  if (chromePath) {
+    try {
+      globalThis.__gstSharedBrowser = await puppeteer.launch({
+        executablePath: chromePath,
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--no-zygote",
+          "--no-first-run",
+          "--disable-extensions",
+          "--disable-default-apps",
+          "--mute-audio",
+          "--disable-background-networking",
+          "--window-size=1024,768",
+        ],
+      });
+      return globalThis.__gstSharedBrowser;
+    } catch (e) {
+      console.warn("Local Chrome launch failed, falling back to bundled chromium...", e);
+    }
   }
+
+  // 2. Try @sparticuz/chromium on Cloud / Vercel / AWS Lambda / Serverless
+  try {
+    const execPath = await chromium.executablePath();
+    if (execPath) {
+      globalThis.__gstSharedBrowser = await puppeteer.launch({
+        executablePath: execPath,
+        args: chromium.args || [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+        ],
+        headless: true,
+      });
+      return globalThis.__gstSharedBrowser;
+    }
+  } catch (cloudErr) {
+    console.warn("Sparticuz chromium launch failed:", cloudErr);
+  }
+
+  return null;
 }
 
 function cleanOldSessions() {
@@ -136,13 +160,37 @@ function cleanOldSessions() {
 }
 
 function getChromePath(): string | null {
+  const envPath = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || process.env.GOOGLE_CHROME_BIN;
+  if (envPath && fs.existsSync(envPath)) return envPath;
+
   const possiblePaths = [
+    // Linux / VPS / Docker / Cloud paths
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chrome",
+    "/usr/local/bin/google-chrome",
+    "/usr/local/bin/chromium",
+    "/usr/local/bin/chrome",
+    "/snap/bin/chromium",
+    "/snap/bin/google-chrome",
+    "/opt/google/chrome/chrome",
+    "/opt/google/chrome/google-chrome",
+
+    // Windows paths
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
     process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Google\\Chrome\\Application\\chrome.exe") : "",
     process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, "Google\\Chrome\\Application\\chrome.exe") : "",
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  ].filter(Boolean);
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+
+    // macOS paths
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  ].filter(Boolean) as string[];
 
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) return p;
@@ -257,6 +305,14 @@ function parseGstPortalData(raw: string) {
     const isJurisdiction = /\bjurisdiction\b|\bdivision\b|\brange\s*-|\bunit\s*-|\bghatak\b|\bcommissionerate\b|\bzone\b|\bstate\s*-/i.test(l);
 
     if (!isJurisdiction) {
+      if (l.toLowerCase().includes("principal place of business")) {
+        const cleaned = l.replace(/^.*principal place of business\s*[:\-–]?\s*/i, "").trim();
+        if (cleaned.length > 15) {
+          address = cleaned;
+          break;
+        }
+      }
+
       if (
         (l.match(/\b(39[0-9]{4}|[1-9][0-9]{5})\b/) ||
           l.toLowerCase().includes("floor") ||
@@ -269,12 +325,11 @@ function parseGstPortalData(raw: string) {
           l.toLowerCase().includes("surat") ||
           l.toLowerCase().includes("nagar") ||
           l.toLowerCase().includes("park")) &&
-        l.length > 20 &&
+        l.length > 15 &&
         !l.toLowerCase().startsWith("search result") &&
-        !l.toLowerCase().startsWith("administrative office") &&
-        !l.toLowerCase().startsWith("principal place of business")
+        !l.toLowerCase().startsWith("administrative office")
       ) {
-        address = l.trim();
+        address = l.replace(/^.*principal place of business\s*[:\-–]?\s*/i, "").trim();
         break;
       }
     }
@@ -579,14 +634,13 @@ export async function POST(req: Request) {
       const chromePath = getChromePath();
       const browser = await getSharedBrowser();
       if (!browser) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Chrome browser not found on host machine. Please open official portal to copy details.",
-            officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
-          },
-          { status: 500 }
-        );
+        return NextResponse.json({
+          success: false,
+          isCloudMode: true,
+          error: "Cloud Serverless Environment: Direct browser automation is not available in cloud functions. Use 1-Click Copy & Paste Tool.",
+          officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
+          gstin: cleanGstin,
+        });
       }
 
       const page = await browser.newPage();
