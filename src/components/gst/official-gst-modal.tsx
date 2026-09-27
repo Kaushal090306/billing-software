@@ -173,6 +173,7 @@ export function OfficialGstModal({
           action: "solve",
           sessionId,
           captchaCode: code,
+          gstin: cleanGstin,
         }),
       });
       const data = await res.json();

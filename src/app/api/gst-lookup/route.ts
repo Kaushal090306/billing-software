@@ -9,6 +9,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const GST_VERIFY_API_KEY =
+  process.env.GST_VERIFY_API_KEY || "gk_CegJokHnLMzIuNWB0i6BOUkTBcvzLPv6AuY3OzSj5zyYL9CZ";
+
 const CHROMIUM_PACK_URL =
   "https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar";
 
@@ -287,6 +290,12 @@ function isValidBusinessName(name: string | null | undefined): boolean {
   const clean = name.toLowerCase().trim().replace(/[:\-–.]/g, "").replace(/\s+/g, " ").trim();
   if (clean.length < 2 || clean.length > 90) return false;
   return !INVALID_NAMES.some((inv) => clean === inv || clean.startsWith(inv + " ") || clean.includes(inv));
+}
+
+function isValidBase64Image(str: string | null | undefined): boolean {
+  if (!str || typeof str !== "string") return false;
+  if (str.includes("PGh0bWw") || str.includes("Request Rejected") || str.length < 500) return false;
+  return str.startsWith("data:image/") || str.startsWith("iVBORw0KGgo");
 }
 
 function isGstPortalLabel(text: string): boolean {
@@ -646,6 +655,28 @@ export async function POST(req: Request) {
         }
       } catch (e) {}
 
+      // 1. High-Speed Cloud Gateway for Official GST Captcha (300ms, Vercel & Localhost compatible)
+      try {
+        const capRes = await fetch("https://api.gstverify.dubey.app/api/v1/gst/captcha", {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          cache: "no-store",
+        });
+        if (capRes.ok) {
+          const capData = await capRes.json();
+          if (capData && capData.sessionId && isValidBase64Image(capData.image)) {
+            return NextResponse.json({
+              success: true,
+              requiresCaptcha: true,
+              captchaImage: capData.image,
+              sessionId: capData.sessionId,
+              gstin: cleanGstin,
+            });
+          }
+        }
+      } catch (gwErr) {
+        console.warn("Direct captcha gateway error, falling back to local headless browser:", gwErr);
+      }
+
       cleanOldSessions();
 
       const chromePath = getChromePath();
@@ -760,12 +791,94 @@ export async function POST(req: Request) {
 
     // Action 3: Solve Captcha & Extract Official Result
     if (action === "solve" || action === "submit_captcha") {
-      const { sessionId, captchaCode } = body;
+      const { sessionId, captchaCode, gstin: reqGstin } = body;
       if (!sessionId || !captchaCode) {
         return NextResponse.json(
           { success: false, error: "Session ID and Captcha Code are required." },
           { status: 400 }
         );
+      }
+
+      // Handle Gateway Session IDs (UUID format with dashes)
+      if (sessionId && sessionId.includes("-")) {
+        try {
+          const targetGst = (reqGstin || body.gstin || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+          const detRes = await fetch("https://api.gstverify.dubey.app/api/v1/gst/details", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": GST_VERIFY_API_KEY,
+            },
+            body: JSON.stringify({
+              gstin: targetGst,
+              sessionId,
+              captcha: String(captchaCode).trim(),
+              full: true,
+            }),
+          });
+          const detData = await detRes.json();
+
+          if (detData.success && detData.data) {
+            const d = detData.data;
+            const legalName = d.lgnm || "";
+            const tradeName = d.tradeNam || d.lgnm || "";
+            const status = d.sts || "ACTIVE";
+            const constitution = d.ctb || "";
+            const targetGstinClean = (d.gstin || targetGst).toUpperCase();
+            const stateCode = targetGstinClean.substring(0, 2);
+            const pan = targetGstinClean.substring(2, 12);
+            const entityCode = pan.charAt(3);
+            const stateName = GST_STATE_MAP[stateCode] || "Gujarat";
+
+            let address = d.principal_address || "";
+            if (!address && d.principal_address_raw) {
+              const a = d.principal_address_raw;
+              address = [a.bno, a.flno, a.bnm, a.st, a.loc, a.dst, a.stcd, a.pncd].filter(Boolean).join(", ");
+            }
+            if (!address && d.stj) {
+              address = d.stj;
+            }
+
+            const pinMatch = address.match(/\b([1-9][0-9]{5})\b/);
+            const pincode = pinMatch ? pinMatch[1] : stateCode === "24" ? "395010" : "";
+            const city = address.toUpperCase().includes("SURAT") ? "SURAT" : stateCode === "24" ? "SURAT" : "";
+
+            return NextResponse.json({
+              success: true,
+              verified: true,
+              gstin: targetGstinClean,
+              legalName,
+              tradeName,
+              businessName: (tradeName || legalName).toUpperCase(),
+              contactPerson: legalName || tradeName || undefined,
+              address: (address || "").toUpperCase(),
+              city: (city || "SURAT").toUpperCase(),
+              state: stateName,
+              stateCode,
+              pincode,
+              pan,
+              entityType: constitution || PAN_ENTITY_TYPES[entityCode] || "Business Entity",
+              status: status.toUpperCase(),
+              source: "official_gst_portal_live",
+              officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
+            });
+          } else {
+            // Incorrect captcha, fetch fresh one
+            const newCap = await fetch("https://api.gstverify.dubey.app/api/v1/gst/captcha")
+              .then((r) => r.json())
+              .catch(() => null);
+
+            return NextResponse.json({
+              success: false,
+              error: detData.detail || "Incorrect Captcha. Please enter the new characters shown.",
+              requiresCaptcha: true,
+              captchaImage: isValidBase64Image(newCap?.image) ? newCap.image : null,
+              sessionId: newCap?.sessionId || sessionId,
+            });
+          }
+        } catch (gwSolveErr: any) {
+          console.warn("Gateway solve error, checking local sessions:", gwSolveErr);
+        }
       }
 
       const session = sessions.get(sessionId);
@@ -1087,6 +1200,22 @@ export async function POST(req: Request) {
     // Action 4: Refresh Captcha on existing session
     if (action === "refresh_captcha") {
       const { sessionId } = body;
+      if (sessionId && sessionId.includes("-")) {
+        try {
+          const newCap = await fetch("https://api.gstverify.dubey.app/api/v1/gst/captcha", {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            cache: "no-store",
+          }).then((r) => r.json());
+          if (newCap && isValidBase64Image(newCap.image)) {
+            return NextResponse.json({
+              success: true,
+              captchaImage: newCap.image,
+              sessionId: newCap.sessionId || sessionId,
+            });
+          }
+        } catch (e) {}
+      }
+
       const session = sessions.get(sessionId);
       if (!session) {
         return NextResponse.json(
