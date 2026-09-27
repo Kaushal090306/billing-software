@@ -655,37 +655,54 @@ export async function POST(req: Request) {
         }
       } catch (e) {}
 
-      // 1. High-Speed Cloud Gateway for Official GST Captcha (300ms, Vercel & Localhost compatible)
-      try {
-        const capRes = await fetch("https://api.gstverify.dubey.app/api/v1/gst/captcha", {
-          headers: { "User-Agent": "Mozilla/5.0" },
-          cache: "no-store",
-        });
-        if (capRes.ok) {
-          const capData = await capRes.json();
-          if (capData && capData.sessionId && isValidBase64Image(capData.image)) {
-            return NextResponse.json({
-              success: true,
-              requiresCaptcha: true,
-              captchaImage: capData.image,
-              sessionId: capData.sessionId,
-              gstin: cleanGstin,
-            });
+      // 1. High-Speed Cloud Gateway for Official GST Captcha (with automatic 2x retry)
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 6000);
+          const capRes = await fetch("https://api.gstverify.dubey.app/api/v1/gst/captcha", {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
+
+          if (capRes.ok) {
+            const capData = await capRes.json();
+            if (capData && capData.sessionId && isValidBase64Image(capData.image)) {
+              return NextResponse.json({
+                success: true,
+                requiresCaptcha: true,
+                captchaImage: capData.image,
+                sessionId: capData.sessionId,
+                gstin: cleanGstin,
+              });
+            }
           }
+        } catch (gwErr) {
+          if (attempt === 1) await new Promise((r) => setTimeout(r, 400));
         }
-      } catch (gwErr) {
-        console.warn("Direct captcha gateway error, falling back to local headless browser:", gwErr);
       }
 
       cleanOldSessions();
 
       const chromePath = getChromePath();
+      // On cloud serverless, do not launch slow headless browser that gets blocked by WAF
+      if (!chromePath) {
+        return NextResponse.json({
+          success: false,
+          error: "GST portal is currently refreshing security tokens. Please click 'Retry Live Fetch'.",
+          officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
+          gstin: cleanGstin,
+        });
+      }
+
       const browser = await getSharedBrowser();
       if (!browser) {
         return NextResponse.json({
           success: false,
           isCloudMode: true,
-          error: "Cloud Serverless Environment: Direct browser automation is not available in cloud functions. Use 1-Click Copy & Paste Tool.",
+          error: "GST portal search input could not be loaded. Please click 'Retry Live Fetch' or use Paste Tool.",
           officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
           gstin: cleanGstin,
         });
