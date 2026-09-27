@@ -294,7 +294,14 @@ function isValidBusinessName(name: string | null | undefined): boolean {
 
 function isValidBase64Image(str: string | null | undefined): boolean {
   if (!str || typeof str !== "string") return false;
-  if (str.includes("PGh0bWw") || str.includes("Request Rejected") || str.length < 500) return false;
+  if (
+    str.includes("PGh0bWw") ||
+    str.includes("Request Rejected") ||
+    str.includes("<html>") ||
+    str.length < 800
+  ) {
+    return false;
+  }
   return str.startsWith("data:image/") || str.startsWith("iVBORw0KGgo");
 }
 
@@ -691,7 +698,8 @@ export async function POST(req: Request) {
       if (!chromePath) {
         return NextResponse.json({
           success: false,
-          error: "GST portal is currently refreshing security tokens. Please click 'Retry Live Fetch'.",
+          requiresPortalFallback: true,
+          error: "Official GST portal security requires direct browser verification. Click 'Open Official Portal' below.",
           officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
           gstin: cleanGstin,
         });
@@ -701,8 +709,8 @@ export async function POST(req: Request) {
       if (!browser) {
         return NextResponse.json({
           success: false,
-          isCloudMode: true,
-          error: "GST portal search input could not be loaded. Please click 'Retry Live Fetch' or use Paste Tool.",
+          requiresPortalFallback: true,
+          error: "Official GST portal security requires direct browser verification. Click 'Open Official Portal' below.",
           officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
           gstin: cleanGstin,
         });
@@ -880,16 +888,27 @@ export async function POST(req: Request) {
               officialPortalUrl: "https://services.gst.gov.in/services/searchtp",
             });
           } else {
-            // Incorrect captcha, fetch fresh one
+            // Incorrect captcha or rate limit
+            const isRateLimit =
+              detData.detail?.toLowerCase().includes("unavailable") ||
+              detData.detail?.toLowerCase().includes("refunded") ||
+              detData.detail?.toLowerCase().includes("credit") ||
+              detData.detail?.toLowerCase().includes("rejected");
+
             const newCap = await fetch("https://api.gstverify.dubey.app/api/v1/gst/captcha")
               .then((r) => r.json())
               .catch(() => null);
 
+            const validNewImage = isValidBase64Image(newCap?.image) ? newCap.image : null;
+
             return NextResponse.json({
               success: false,
-              error: detData.detail || "Incorrect Captcha. Please enter the new characters shown.",
-              requiresCaptcha: true,
-              captchaImage: isValidBase64Image(newCap?.image) ? newCap.image : null,
+              error: isRateLimit
+                ? "Official GST portal security requires direct browser check. Click 'Open Official Portal' below."
+                : (detData.detail || "Incorrect Captcha. Please enter the new characters shown."),
+              requiresCaptcha: !!validNewImage && !isRateLimit,
+              requiresPortalFallback: !validNewImage || isRateLimit,
+              captchaImage: validNewImage,
               sessionId: newCap?.sessionId || sessionId,
             });
           }

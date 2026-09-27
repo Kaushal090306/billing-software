@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Copy,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -90,6 +91,69 @@ export function OfficialGstModal({
     }
   }, [captchaImage]);
 
+  // Auto-detect copied GST details when returning from official portal tab
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleWindowFocus = async () => {
+      try {
+        if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.readText) {
+          const text = await navigator.clipboard.readText();
+          if (
+            text &&
+            (text.includes("Legal Name") ||
+              text.includes("Trade Name") ||
+              text.includes("Principal Place") ||
+              text.includes("Constitution") ||
+              text.includes("GSTIN / UIN") ||
+              (cleanGstin && text.toUpperCase().includes(cleanGstin)))
+          ) {
+            const res = await fetch("/api/gst-lookup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "parse_text", rawText: text, gstin: cleanGstin }),
+            });
+            const data = await res.json();
+            if (data.success && data.verified && (data.tradeName || data.legalName)) {
+              onSuccess(data);
+              toast.success(`✓ Official Details Auto-Captured from Clipboard: ${data.tradeName || data.businessName || data.gstin}`);
+              onClose();
+            }
+          }
+        }
+      } catch (e) {
+        // Clipboard read permission ignored
+      }
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, [isOpen, cleanGstin, onSuccess, onClose]);
+
+  const handleDirectClipboardPaste = async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim().length > 5) {
+          setPastedText(text);
+          const res = await fetch("/api/gst-lookup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "parse_text", rawText: text, gstin: cleanGstin }),
+          });
+          const data = await res.json();
+          if (data.success && data.verified && (data.tradeName || data.legalName || data.businessName)) {
+            onSuccess(data);
+            toast.success(`✓ Official Details Extracted: ${data.tradeName || data.businessName || data.gstin}`);
+            onClose();
+            return;
+          }
+        }
+      }
+    } catch (e) {}
+    setShowPasteBox(true);
+  };
+
   const handleInitCaptcha = async (gstToUse: string) => {
     setIsLoadingCaptcha(true);
     setCaptchaImage(null);
@@ -116,7 +180,7 @@ export function OfficialGstModal({
         setCaptchaImage(data.captchaImage);
         setSessionId(data.sessionId);
       } else {
-        setErrorMessage(data.error || "Failed to fetch captcha from official portal. Click retry.");
+        setErrorMessage(data.error || "Official GST portal challenge requires browser verification.");
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to initialize official portal verification.");
@@ -190,6 +254,8 @@ export function OfficialGstModal({
           setCaptchaImage(data.captchaImage);
         } else if (data.error?.toLowerCase().includes("expired") || data.error?.toLowerCase().includes("session")) {
           handleInitCaptcha(cleanGstin);
+        } else if (data.requiresPortalFallback) {
+          setCaptchaImage(null);
         }
         setCaptchaCode("");
         setTimeout(() => inputRef.current?.focus(), 150);
@@ -262,7 +328,7 @@ export function OfficialGstModal({
         </DialogHeader>
 
         <div className="space-y-4 pt-1">
-          {/* GSTIN Display & Quick Copy */}
+          {/* GSTIN Display & Quick Actions */}
           <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-border">
             <div>
               <div className="text-[10px] font-semibold text-muted-foreground uppercase">
@@ -272,15 +338,26 @@ export function OfficialGstModal({
                 {cleanGstin || "NO GSTIN SPECIFIED"}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleOpenOfficialSite}
-              className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold hover:underline flex items-center gap-1.5 cursor-pointer bg-white dark:bg-zinc-900 px-2.5 py-1.5 rounded-md border border-purple-200 dark:border-purple-700 shadow-2xs"
-            >
-              <Copy className="h-3 w-3 text-purple-600" />
-              <span>Copy &amp; Open</span>
-              <ExternalLink className="h-3 w-3 ml-0.5 text-muted-foreground" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleDirectClipboardPaste}
+                className="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold hover:underline flex items-center gap-1 cursor-pointer bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1.5 rounded-md border border-emerald-300 dark:border-emerald-700 shadow-2xs"
+                title="Paste copied GST details directly from clipboard"
+              >
+                <ClipboardPaste className="h-3 w-3 text-emerald-600" />
+                <span>Paste</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenOfficialSite}
+                className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold hover:underline flex items-center gap-1 cursor-pointer bg-white dark:bg-zinc-900 px-2.5 py-1.5 rounded-md border border-purple-200 dark:border-purple-700 shadow-2xs"
+              >
+                <Copy className="h-3 w-3 text-purple-600" />
+                <span>Copy &amp; Open</span>
+                <ExternalLink className="h-3 w-3 ml-0.5 text-muted-foreground" />
+              </button>
+            </div>
           </div>
 
           {/* Loading State */}
@@ -296,7 +373,7 @@ export function OfficialGstModal({
             </div>
           )}
 
-          {/* 1. Live Captcha Entry Box */}
+          {/* 1. Live Captcha Challenge (When available from gateway) */}
           {!isLoadingCaptcha && captchaImage && (
             <div className="p-3.5 bg-purple-50/50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800 space-y-3">
               <div className="flex items-center justify-between">
@@ -340,11 +417,30 @@ export function OfficialGstModal({
                 />
               </div>
 
-              {/* Error message */}
+              {/* Error message with Fast Recovery Actions */}
               {errorMessage && (
-                <div className="p-2 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-[11px] text-red-600 dark:text-red-300 flex items-center gap-1.5 font-medium">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>{errorMessage}</span>
+                <div className="p-2.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200 space-y-2 font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                    <span>{errorMessage}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-amber-200/80 dark:border-amber-800/80">
+                    <button
+                      type="button"
+                      onClick={handleRefreshCaptcha}
+                      className="text-[10px] text-purple-700 dark:text-purple-300 bg-white dark:bg-zinc-900 px-2 py-1 rounded border border-purple-200 font-semibold cursor-pointer"
+                    >
+                      🔄 Reload Captcha
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenOfficialSite}
+                      className="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-950/70 px-2 py-1 rounded border border-purple-300 font-semibold cursor-pointer flex items-center gap-1"
+                    >
+                      <ExternalLink className="h-2.5 w-2.5" />
+                      <span>Open Portal Directly</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -370,47 +466,71 @@ export function OfficialGstModal({
             </div>
           )}
 
-          {/* 2. Error Fallback (Retry Live Fetch) */}
-          {!isLoadingCaptcha && !captchaImage && errorMessage && (
-            <div className="space-y-3">
-              <div className="p-3 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-600 dark:text-red-300 space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>Could Not Fetch Captcha Automatically</span>
+          {/* 2. Direct Official Verification Guide (When gateway captcha is bypassed or unavailable) */}
+          {!isLoadingCaptcha && !captchaImage && (
+            <div className="p-4 bg-gradient-to-br from-purple-50/80 to-indigo-50/50 dark:from-purple-950/30 dark:to-zinc-900/60 rounded-xl border border-purple-200 dark:border-purple-800 space-y-3.5 shadow-xs">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <span>Instant Official Portal Auto-Fill</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    GSTIN is already copied. Complete in 3 simple steps:
+                  </p>
                 </div>
-                <p className="text-[11px]">{errorMessage}</p>
+                <Badge variant="outline" className="text-[9px] font-semibold text-purple-600 border-purple-300 bg-white dark:bg-zinc-900">
+                  100% Guaranteed
+                </Badge>
               </div>
 
+              {/* 3 Step Visual Guide */}
+              <div className="space-y-2 text-[11px] bg-white dark:bg-zinc-900/80 p-3 rounded-lg border border-purple-100 dark:border-purple-900/40">
+                <div className="flex items-center gap-2">
+                  <span className="h-4 w-4 rounded-full bg-purple-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">1</span>
+                  <span>Click <b>Open Official Portal</b> (GSTIN auto-copied to clipboard)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-4 w-4 rounded-full bg-purple-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">2</span>
+                  <span>Paste GSTIN, solve captcha &amp; <b>Copy the result table</b></span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-semibold">
+                  <span className="h-4 w-4 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">3</span>
+                  <span><b>Switch back here</b> — Details will auto-populate instantly!</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  onClick={() => handleInitCaptcha(cleanGstin)}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold cursor-pointer"
+                  onClick={handleOpenOfficialSite}
+                  className="flex-1 h-10 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs gap-1.5 shadow-md cursor-pointer"
                 >
-                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                  <span>Retry Live Fetch</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>1. Open Official GST Portal</span>
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handleOpenOfficialSite}
-                  className="flex-1 text-xs font-semibold cursor-pointer"
+                  onClick={handleDirectClipboardPaste}
+                  className="h-10 text-xs font-bold gap-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 cursor-pointer shadow-2xs"
                 >
-                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                  <span>Open Portal</span>
+                  <ClipboardPaste className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Paste Copied</span>
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Quick Paste Alternate Option (Collapsible) */}
+          {/* Quick Paste Box (Collapsible / Manual fallback) */}
           <div className="border-t border-border pt-2.5">
             <button
               type="button"
               onClick={() => setShowPasteBox(!showPasteBox)}
               className="text-[11px] text-muted-foreground hover:text-purple-600 font-medium flex items-center justify-between w-full cursor-pointer"
             >
-              <span>Or paste details directly from browser window:</span>
+              <span>Or paste details directly into text box:</span>
               <span className="text-purple-600 font-semibold">
                 {showPasteBox ? "Hide" : "Paste Tool"}
               </span>
