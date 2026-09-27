@@ -693,25 +693,18 @@ export async function POST(req: Request) {
         });
 
         await page.goto("https://services.gst.gov.in/services/searchtp", {
-          waitUntil: "networkidle2",
-          timeout: 30000,
+          waitUntil: "domcontentloaded",
+          timeout: 25000,
         });
 
-        // Wait for GSTIN input field with multiple fallbacks
-        let gstinInput = await page.waitForSelector("#for_gstin, input[name='gstin'], input[id*='gstin'], input[ng-model*='gstin']", {
-          timeout: 20000,
-        }).catch(() => null);
+        // Wait for GSTIN input field
+        const gstinInput = await page.waitForSelector(
+          "#for_gstin, input[name='gstin'], input[id*='gstin'], input[ng-model*='gstin']",
+          { timeout: 20000 }
+        );
 
         if (!gstinInput) {
-          // If not found, wait a few seconds in case F5 security challenge is redirecting
-          await new Promise((r) => setTimeout(r, 2500));
-          gstinInput = await page.waitForSelector("#for_gstin, input[name='gstin'], input[id*='gstin'], input[ng-model*='gstin']", {
-            timeout: 10000,
-          }).catch(() => null);
-        }
-
-        if (!gstinInput) {
-          throw new Error("GST portal search input could not be loaded. Please retry or use 1-Click Paste Tool.");
+          throw new Error("GST portal search input could not be loaded. Please retry.");
         }
 
         // Type GSTIN into input field
@@ -719,9 +712,10 @@ export async function POST(req: Request) {
         await gstinInput.type(cleanGstin);
 
         // Wait for captcha image to render
-        const captchaEl = await page.waitForSelector("img[src*='captcha'], #imgCaptcha, .captcha-img", {
-          timeout: 20000,
-        }).catch(() => null);
+        const captchaEl = await page.waitForSelector(
+          "img[src*='captcha'], #imgCaptcha, .captcha-img",
+          { timeout: 20000 }
+        );
 
         if (!captchaEl) {
           await page.close().catch(() => {});
