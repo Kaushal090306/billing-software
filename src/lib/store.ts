@@ -179,8 +179,13 @@ export interface BusinessSettings {
   invoicePrefix: string;
   financialYear: string;
   startingInvoiceNo: number;
+  invoiceNumberPadding?: number;
   roundOffMode: "nearest_1" | "nearest_5" | "nearest_10" | "none";
   termsAndConditions: string[];
+
+  // GST Verification Settings
+  gstApiKey?: string;
+  gstApiProvider?: "appyflow" | "rapidapi" | "custom";
 
   // Custom Branding, Logo & Signature
   logoType?: "monogram" | "image" | "none";
@@ -211,6 +216,8 @@ export interface BusinessSettings {
 export interface Customer {
   id: string;
   businessName: string;
+  tradeName?: string;
+  legalName?: string;
   contactPerson: string;
   gstin: string;
   pan: string;
@@ -483,45 +490,49 @@ export const defaultInvoiceTemplates: InvoiceTemplateConfig[] = [
 ];
 
 export const defaultBusinessSettings: BusinessSettings = {
-  companyName: "SHREE MANGALAM THREAD & JARI",
-  devotionalHeader: "ll SHREE GANESHAY NAMAH ll",
+  companyName: "DHARMI THREAD & JARI",
+  devotionalHeader: "ll Shree Ganeshay Namah ll",
   tradeName: "DHARMI THREAD & JARI",
-  address: "SHOP NO.1,JAY NARAYAN IND.-1,ANJANA FARM,SURAT.",
+  address: "E-23, 1st Floor, Sangana Soc., Puna Simada Road, Punagam, Surat-395010.",
   city: "Surat",
   state: "Gujarat",
   stateCode: "24",
-  pincode: "395002",
-  gstin: "24AEYPV3370E1Z1",
-  pan: "AEYPV3370E",
-  phone: "97235 44545",
-  phoneAlt: "98248 55454",
+  pincode: "395010",
+  gstin: "24AGQPT2491L1ZO",
+  pan: "BGOPV6750R",
+  phone: "99256 06480",
+  phoneAlt: "97235 44545",
   email: "dharmithreadjari@gmail.com",
   bankName: "KOTAK BANK",
   branchName: "VRAJBHUMI APT.",
   accountNumber: "9948291051",
   ifscCode: "KKBK0000883",
-  invoicePrefix: "MTJ",
+  invoicePrefix: "DTJ",
   financialYear: "2026-27",
-  startingInvoiceNo: 145,
+  startingInvoiceNo: 1,
+  invoiceNumberPadding: 3,
   roundOffMode: "nearest_1",
   termsAndConditions: [
-    "1. Goods Once Sold Will Not Be Accepted.",
-    "2. \"Subject to \"SURAT\" Jurisdiction. E.&.O.E\"",
+    "1. Any Complaints Of Goods Should be made within 3 days after that no complaint bill be entertained.",
+    "2. We are not responsible for any loss or damage during transit.",
+    "3. Personally Selected Goods will not be taken Back or Exchanged.",
+    "4. Disputes will be settled in Surat Court Only.",
+    "5. Check Qty. of Goods Before Sign.",
   ],
   logoType: "monogram",
   logoUrl: "",
-  monogramText: "SMJ",
+  monogramText: "DTJ",
   monogramSubtext: "THREAD & JARI",
   signatureType: "font",
   signatureUrl: "",
   signatureFont: "'Brush Script MT', cursive, sans-serif",
-  authorizedSignatoryName: "Ketan",
-  signatoryFirmTitle: "For SHREE MANGALAM THREAD & JARI",
+  authorizedSignatoryName: "Pravinbhai",
+  signatoryFirmTitle: "For, Dharmi Thread & Jari",
   signatoryLabel: "(Authorised Signatory)",
   showQrCode: true,
   qrCodeType: "auto",
   qrCodeUrl: "",
-  upiId: "9723544545@okaxis",
+  upiId: "9925606480@kotak",
   activeTemplateId: "tpl_standard_gst",
   templates: defaultInvoiceTemplates,
 };

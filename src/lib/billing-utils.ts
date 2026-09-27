@@ -279,24 +279,48 @@ export function calculateInvoiceSummary(
 }
 
 export function generateNextInvoiceNumber(
-  lastInvoiceNo: string | undefined,
-  prefix = "MTJ",
-  financialYear = "2026-27"
+  lastInvoiceNo: string | undefined | null,
+  prefix = "DTJ",
+  startingNo = 1,
+  padding = 3
 ): string {
-  if (!lastInvoiceNo) {
-    return `${prefix}/145`;
+  let cleanPrefix = (prefix || "DTJ").trim();
+  let defaultStart = Number(startingNo) || 1;
+  let padLength = Number(padding) || 3;
+
+  // Check if prefix itself is in format like "DTJ/001" or "DTJ-001" or ends with a number
+  const prefixMatch = cleanPrefix.match(/^(.*?)[\/\-_]?(\d+)$/);
+  if (prefixMatch && (!lastInvoiceNo || lastInvoiceNo === cleanPrefix)) {
+    const textPart = prefixMatch[1].replace(/[\/\-_]+$/, "");
+    const numPart = prefixMatch[2];
+    cleanPrefix = textPart || "DTJ";
+    defaultStart = parseInt(numPart, 10);
+    padLength = Math.max(padLength, numPart.length);
+  } else {
+    cleanPrefix = cleanPrefix.replace(/[\/\-_]+$/, "");
   }
 
-  const matches = lastInvoiceNo.match(/(\d+)$/);
+  if (!lastInvoiceNo || lastInvoiceNo.trim() === "") {
+    const formattedNum = String(defaultStart).padStart(padLength, "0");
+    return `${cleanPrefix}/${formattedNum}`;
+  }
+
+  const matches = lastInvoiceNo.trim().match(/(\d+)$/);
   if (matches && matches[1]) {
-    const num = parseInt(matches[1], 10) + 1;
-    const padLength = matches[1].length;
-    const nextSeq = String(num).padStart(padLength, "0");
-    const prefixPart = lastInvoiceNo.substring(0, matches.index);
+    const currentNum = parseInt(matches[1], 10);
+    const nextNum = Math.max(currentNum + 1, defaultStart);
+    const effectivePad = Math.max(matches[1].length, padLength);
+    const nextSeq = String(nextNum).padStart(effectivePad, "0");
+
+    let prefixPart = lastInvoiceNo.substring(0, matches.index);
+    if (!prefixPart.endsWith("/") && !prefixPart.endsWith("-")) {
+      prefixPart = `${cleanPrefix}/`;
+    }
     return `${prefixPart}${nextSeq}`;
   }
 
-  return `${prefix}/146`;
+  const formattedNum = String(defaultStart).padStart(padLength, "0");
+  return `${cleanPrefix}/${formattedNum}`;
 }
 
 export function buildWhatsAppInvoiceShareUrl(

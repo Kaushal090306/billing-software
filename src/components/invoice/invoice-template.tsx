@@ -1,6 +1,6 @@
 "use client";
 
-import React, { forwardRef, useState, useRef, useEffect } from "react";
+import React, { forwardRef, useState, useRef, useEffect, useMemo } from "react";
 import QRCode from "qrcode";
 import {
   Invoice,
@@ -626,6 +626,24 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       Boolean(settings.stateCode) &&
       invoice.customerStateCode !== settings.stateCode;
     const isRaw = invoice.billType === "raw";
+
+    // Dynamic GST Rate calculation for percentage labels
+    const gstRateForDisplay = useMemo(() => {
+      if (invoice.items && invoice.items.length > 0) {
+        const itemWithGst = invoice.items.find((it) => it.gstRate && it.gstRate > 0);
+        if (itemWithGst && itemWithGst.gstRate) return itemWithGst.gstRate;
+      }
+      if (invoice.totalTaxable && invoice.totalTaxable > 0) {
+        const totalTax = (invoice.totalCgst || 0) + (invoice.totalSgst || 0) + (invoice.totalIgst || 0);
+        const computed = Math.round((totalTax / invoice.totalTaxable) * 100);
+        if (computed > 0) return computed;
+      }
+      return 5;
+    }, [invoice.items, invoice.totalTaxable, invoice.totalCgst, invoice.totalSgst, invoice.totalIgst]);
+
+    const cgstPct = (gstRateForDisplay / 2).toFixed(1).replace(/\.0$/, "");
+    const sgstPct = (gstRateForDisplay / 2).toFixed(1).replace(/\.0$/, "");
+    const igstPct = gstRateForDisplay.toFixed(1).replace(/\.0$/, "");
 
     // Supplier details from reactive settings
     const companyTitle = settings.companyName || "SHREE MANGALAM THREAD & JARI";
@@ -1900,68 +1918,41 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 ) : (
                   <>
                     <th
-                      className="border-r py-1 px-1 w-[4%]"
+                      className="border-r py-1 px-1 w-[5%]"
                       style={{ borderColor }}
                     >
                       Sr.
                     </th>
                     <th
-                      className="border-r py-1 px-1 text-left w-[28%]"
+                      className="border-r py-1 px-1 text-left w-[45%]"
                       style={{ borderColor }}
                     >
                       Product Name
                     </th>
                     <th
-                      className="border-r py-1 px-1 w-[10%]"
+                      className="border-r py-1 px-1 w-[12%]"
                       style={{ borderColor }}
                     >
                       HSN
                     </th>
                     <th
-                      className="border-r py-1 px-1 w-[11%]"
+                      className="border-r py-1 px-1 w-[12%]"
                       style={{ borderColor }}
                     >
                       Qty.
                     </th>
                     <th
-                      className="border-r py-1 px-1 w-[11%]"
+                      className="border-r py-1 px-1 w-[12%]"
                       style={{ borderColor }}
                     >
                       Rate
                     </th>
                     <th
-                      className="border-r py-1 px-1 w-[14%]"
+                      className="py-1 px-1 w-[14%]"
                       style={{ borderColor }}
                     >
-                      Taxable <br />
-                      Amount
+                      Taxable Amount
                     </th>
-                    <th
-                      className="border-r py-1 px-1 w-[6%]"
-                      style={{ borderColor }}
-                    >
-                      GST %
-                    </th>
-                    {!isInterstate ? (
-                      <>
-                        <th
-                          className="border-r py-1 px-1 w-[8%]"
-                          style={{ borderColor }}
-                        >
-                          CGST <br />
-                          Amt.
-                        </th>
-                        <th className="py-1 px-1 w-[8%]">
-                          SGST <br />
-                          Amt.
-                        </th>
-                      </>
-                    ) : (
-                      <th className="py-1 px-1 w-[16%]">
-                        IGST <br />
-                        Amt.
-                      </th>
-                    )}
                   </>
                 )}
               </tr>
@@ -2083,37 +2074,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
                         style={{ borderColor }}
                       >
-                        {formatNumber(item.rate, 4)}
+                        {formatNumber(item.rate, 2)}
                       </td>
                       <td
-                        className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
+                        className="py-0.5 px-1 text-right font-mono font-black text-[1.15em]"
                         style={{ borderColor }}
                       >
                         {formatNumber(item.taxableAmount, 2)}
                       </td>
-                      <td
-                        className="border-r py-0.5 px-1 text-center font-mono font-bold text-[1.05em]"
-                        style={{ borderColor }}
-                      >
-                        {item.gstRate.toFixed(3)}
-                      </td>
-                      {!isInterstate ? (
-                        <>
-                          <td
-                            className="border-r py-0.5 px-1 text-right font-mono font-bold text-[1.05em]"
-                            style={{ borderColor }}
-                          >
-                            {formatNumber(item.cgstAmount, 2)}
-                          </td>
-                          <td className="py-0.5 px-1 text-right font-mono font-bold text-[1.05em]">
-                            {formatNumber(item.sgstAmount, 2)}
-                          </td>
-                        </>
-                      ) : (
-                        <td className="py-0.5 px-1 text-right font-mono font-bold text-[1.05em]">
-                          {formatNumber(item.igstAmount, 2)}
-                        </td>
-                      )}
                     </>
                   )}
                 </tr>
@@ -2127,34 +2095,12 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     template.tableDensity === "compact" ? "h-5" : "h-6"
                   }
                 >
-                  {isRaw ? (
-                    <>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td></td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      <td className="border-r" style={{ borderColor }}></td>
-                      {!isInterstate ? (
-                        <>
-                          <td className="border-r" style={{ borderColor }}></td>
-                          <td></td>
-                        </>
-                      ) : (
-                        <td></td>
-                      )}
-                    </>
-                  )}
+                  <td className="border-r" style={{ borderColor }}></td>
+                  <td className="border-r" style={{ borderColor }}></td>
+                  <td className="border-r" style={{ borderColor }}></td>
+                  <td className="border-r" style={{ borderColor }}></td>
+                  <td className="border-r" style={{ borderColor }}></td>
+                  <td></td>
                 </tr>
               ))}
 
@@ -2227,32 +2173,11 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       style={{ borderColor }}
                     ></td>
                     <td
-                      className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.2em]"
+                      className="py-0.5 px-1 text-right font-mono font-black text-[1.2em]"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.totalTaxable, 2)}
                     </td>
-                    <td
-                      className="border-r py-0.5 px-1"
-                      style={{ borderColor }}
-                    ></td>
-                    {!isInterstate ? (
-                      <>
-                        <td
-                          className="border-r py-0.5 px-1 text-right font-mono font-black text-[1.1em]"
-                          style={{ borderColor }}
-                        >
-                          {formatNumber(invoice.totalCgst, 2)}
-                        </td>
-                        <td className="py-0.5 px-1 text-right font-mono font-black text-[1.1em]">
-                          {formatNumber(invoice.totalSgst, 2)}
-                        </td>
-                      </>
-                    ) : (
-                      <td className="py-0.5 px-1 text-right font-mono font-black text-[1.1em]">
-                        {formatNumber(invoice.totalIgst, 2)}
-                      </td>
-                    )}
                   </>
                 )}
               </tr>
@@ -2440,13 +2365,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 {!isInterstate ? (
                   <>
                     <div className="flex justify-between font-bold">
-                      <span>CGST</span>
+                      <span>CGST ({cgstPct}%)</span>
                       <span className="font-mono font-bold text-[1.1em]">
                         {formatNumber(invoice.totalCgst, 2)}
                       </span>
                     </div>
                     <div className="flex justify-between font-bold">
-                      <span>SGST</span>
+                      <span>SGST ({sgstPct}%)</span>
                       <span className="font-mono font-bold text-[1.1em]">
                         {formatNumber(invoice.totalSgst, 2)}
                       </span>
@@ -2454,7 +2379,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </>
                 ) : (
                   <div className="flex justify-between font-bold">
-                    <span>IGST</span>
+                    <span>IGST ({igstPct}%)</span>
                     <span className="font-mono font-bold text-[1.1em]">
                       {formatNumber(invoice.totalIgst, 2)}
                     </span>

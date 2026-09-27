@@ -57,6 +57,7 @@ import { InvoicePreviewModal } from "@/components/invoice/invoice-preview-modal"
 import { useSidebar } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import Link from "next/link";
+import { OfficialGstModal } from "@/components/gst/official-gst-modal";
 
 function NewInvoiceContent() {
   const searchParams = useSearchParams();
@@ -136,7 +137,7 @@ function NewInvoiceContent() {
       finalAmount?: string | number;
       gstRate: number;
       suggestedRate: number | null;
-      lastEditedField?: "rate" | "pricePerPiece" | "finalAmount";
+      lastEditedField?: "rate" | "pricePerPiece" | "finalAmount" | "quantity";
     }>
   >([
     {
@@ -151,7 +152,7 @@ function NewInvoiceContent() {
       finalAmount: "",
       gstRate: initialBillType === "raw" ? 0 : 5,
       suggestedRate: null,
-      lastEditedField: "pricePerPiece",
+      lastEditedField: "rate",
     },
   ]);
 
@@ -176,12 +177,41 @@ function NewInvoiceContent() {
   // Add Customer Inline Modal
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState<boolean>(false);
   const [newCustName, setNewCustName] = useState("");
+  const [newCustTradeName, setNewCustTradeName] = useState("");
+  const [newCustLegalName, setNewCustLegalName] = useState("");
   const [newCustGstin, setNewCustGstin] = useState("");
   const [newCustAddress, setNewCustAddress] = useState("");
   const [newCustMobile, setNewCustMobile] = useState("");
   const [newCustCity, setNewCustCity] = useState("Surat");
   const [newCustState, setNewCustState] = useState("Gujarat");
   const [newCustStateCode, setNewCustStateCode] = useState("24");
+  const [isFetchingNewCustGst, setIsFetchingNewCustGst] = useState(false);
+  const [isFetchingInvoiceCustGst, setIsFetchingInvoiceCustGst] = useState(false);
+  const [isInvoiceGstModalOpen, setIsInvoiceGstModalOpen] = useState(false);
+  const [activeLookupGstin, setActiveLookupGstin] = useState("");
+  const [gstLookupTarget, setGstLookupTarget] = useState<"invoice" | "new_modal">("invoice");
+
+  const handleLookupNewCustGstin = async (gstinVal: string) => {
+    const clean = gstinVal.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (clean.length < 15) {
+      toast.error("Please enter a 15-digit GSTIN number");
+      return;
+    }
+    setActiveLookupGstin(clean);
+    setGstLookupTarget("new_modal");
+    setIsInvoiceGstModalOpen(true);
+  };
+
+  const handleLookupInvoiceCustGstin = async (gstinVal: string) => {
+    const clean = gstinVal.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (clean.length < 15) {
+      toast.error("Please enter a 15-digit GSTIN number");
+      return;
+    }
+    setActiveLookupGstin(clean);
+    setGstLookupTarget("invoice");
+    setIsInvoiceGstModalOpen(true);
+  };
 
   // Add Product Inline Modal
   const [isAddProductOpen, setIsAddProductOpen] = useState<boolean>(false);
@@ -268,6 +298,7 @@ function NewInvoiceContent() {
 
     // Generate Next Invoice Number based on effective bill type
     const isTargetRaw = rawParam && !convertRawBillIdsParam;
+    const currentPrefix = (loadedSettings.invoicePrefix || "DTJ").trim();
     if (isTargetRaw) {
       setBillType("raw");
       const rawCount = loadedInvoices.filter((i) => i.billType === "raw").length;
@@ -280,22 +311,28 @@ function NewInvoiceContent() {
       );
     } else if (convertRawBillIdsParam) {
       setBillType("gst");
-      const lastGstInv = loadedInvoices.find((i) => i.billType !== "raw")?.invoiceNo || "MTJ/144";
+      const lastGstInv = loadedInvoices.find(
+        (i) => i.billType !== "raw" && i.invoiceNo && i.invoiceNo.startsWith(currentPrefix)
+      )?.invoiceNo;
       const nextNo = generateNextInvoiceNumber(
         lastGstInv,
-        loadedSettings.invoicePrefix || "MTJ",
-        loadedSettings.financialYear || "2026-27"
+        currentPrefix,
+        loadedSettings.startingInvoiceNo || 1,
+        loadedSettings.invoiceNumberPadding || 3
       );
       setInvoiceNo(nextNo);
     } else if (billType === "raw") {
       const rawCount = loadedInvoices.filter((i) => i.billType === "raw").length;
       setInvoiceNo(`RAW/${rawCount + 101}`);
     } else {
-      const lastGstInv = loadedInvoices.find((i) => i.billType !== "raw")?.invoiceNo || "MTJ/144";
+      const lastGstInv = loadedInvoices.find(
+        (i) => i.billType !== "raw" && i.invoiceNo && i.invoiceNo.startsWith(currentPrefix)
+      )?.invoiceNo;
       const nextNo = generateNextInvoiceNumber(
         lastGstInv,
-        loadedSettings.invoicePrefix || "MTJ",
-        loadedSettings.financialYear || "2026-27"
+        currentPrefix,
+        loadedSettings.startingInvoiceNo || 1,
+        loadedSettings.invoiceNumberPadding || 3
       );
       setInvoiceNo(nextNo);
     }
@@ -484,15 +521,18 @@ function NewInvoiceContent() {
 
   // Add New Customer inline
   const handleAddNewCustomer = () => {
-    if (!newCustName.trim() || !newCustMobile.trim()) {
+    const effectiveTrade = (newCustTradeName.trim() || newCustName.trim() || newCustLegalName.trim()).toUpperCase();
+    if (!effectiveTrade || !newCustMobile.trim()) {
       toast.error("Please enter customer name and mobile number");
       return;
     }
 
     const newCust: Customer = {
       id: `cust_${Date.now()}`,
-      businessName: newCustName.trim().toUpperCase(),
-      contactPerson: newCustName.trim(),
+      businessName: effectiveTrade,
+      tradeName: (newCustTradeName.trim() || effectiveTrade).toUpperCase(),
+      legalName: newCustLegalName.trim().toUpperCase(),
+      contactPerson: newCustLegalName.trim() || newCustName.trim(),
       gstin: newCustGstin.trim().toUpperCase(),
       pan: newCustGstin.trim().substring(2, 12).toUpperCase(),
       address: newCustAddress.trim().toUpperCase(),
@@ -597,8 +637,20 @@ function NewInvoiceContent() {
       const isRaw = billType === "raw";
       const rt = suggested !== null ? suggested : prod.defaultRate;
       const gst = isRaw ? 0 : prod.gstRate;
-      const ppp = isRaw ? rt : rt * (1 + gst / 100);
       const qNum = Number(updated[index].quantity) || 0;
+      const faNum = Number(updated[index].finalAmount) || 0;
+
+      let newQty = updated[index].quantity;
+      let newFinal = updated[index].finalAmount;
+
+      if (qNum > 0) {
+        const taxable = qNum * rt;
+        const total = isRaw ? taxable : taxable * (1 + gst / 100);
+        newFinal = total.toFixed(2);
+      } else if (faNum > 0 && rt > 0) {
+        const taxable = isRaw ? faNum : Math.round((faNum / (1 + gst / 100)) * 100) / 100;
+        newQty = (taxable / rt).toFixed(3);
+      }
 
       updated[index] = {
         ...updated[index],
@@ -607,11 +659,12 @@ function NewInvoiceContent() {
         hsn: prod.hsn,
         unit: prod.unit,
         gstRate: isRaw ? 0 : prod.gstRate,
-        rate: isRaw ? rt.toFixed(2) : rt,
-        pricePerPiece: ppp > 0 ? ppp.toFixed(2) : "",
-        finalAmount: qNum > 0 && ppp > 0 ? (qNum * ppp).toFixed(2) : updated[index].finalAmount,
+        rate: String(rt),
+        pricePerPiece: String(rt),
+        finalAmount: newFinal,
+        quantity: newQty,
         suggestedRate: suggested,
-        lastEditedField: "pricePerPiece",
+        lastEditedField: "rate",
       };
       return updated;
     });
@@ -633,7 +686,7 @@ function NewInvoiceContent() {
         finalAmount: "",
         gstRate: billType === "raw" ? 0 : 5,
         suggestedRate: null,
-        lastEditedField: "pricePerPiece",
+        lastEditedField: "rate",
       },
     ]);
   };
@@ -812,7 +865,12 @@ function NewInvoiceContent() {
 
       let derivedRate = rt;
       if (it.finalAmount && Number(it.finalAmount) > 0 && qty > 0) {
-        derivedRate = Math.round((itemTaxable / qty) * 10000) / 10000;
+        const calcRate = Math.round((itemTaxable / qty) * 10000) / 10000;
+        if (rt > 0 && Math.abs(calcRate - rt) < 0.05) {
+          derivedRate = rt;
+        } else {
+          derivedRate = calcRate;
+        }
       }
       const ppp = it.pricePerPiece ? Number(it.pricePerPiece) : (qty > 0 ? itemTotal / qty : 0);
 
@@ -1068,34 +1126,76 @@ function NewInvoiceContent() {
                     </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-3 py-2 text-xs">
-                    <div>
-                      <Label className="text-xs font-medium">Business Name *</Label>
-                      <Input
-                        placeholder="e.g. SHREE MANGALAM THREAD & JARI"
-                        value={newCustName}
-                        onChange={(e) => setNewCustName(e.target.value)}
-                        className="mt-1 uppercase font-semibold"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs font-medium">GSTIN</Label>
+                    {/* GSTIN First with Auto Fetch Button */}
+                    <div className="p-2.5 bg-purple-50/60 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-xs font-semibold text-purple-900 dark:text-purple-200 flex items-center gap-1">
+                          <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                          <span>GSTIN (Auto-Fill Customer)</span>
+                        </Label>
+                        <span className="text-[10px] text-muted-foreground">Official Check</span>
+                      </div>
+                      <div className="flex gap-1.5">
                         <Input
-                          placeholder="24AEYPV3370E1Z1"
+                          placeholder="24ASVPG5889L1ZR"
                           value={newCustGstin}
-                          onChange={(e) => setNewCustGstin(e.target.value)}
-                          className="mt-1 font-mono uppercase font-normal"
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setNewCustGstin(val);
+                            const clean = val.replace(/[^A-Z0-9]/g, "");
+                            if (clean.length === 15) {
+                              handleLookupNewCustGstin(clean);
+                            }
+                          }}
+                          className="font-mono uppercase font-bold text-xs h-8 bg-white dark:bg-zinc-900 flex-1"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleLookupNewCustGstin(newCustGstin)}
+                          disabled={isFetchingNewCustGst || !newCustGstin || newCustGstin.trim().length < 15}
+                          className="h-8 px-2.5 text-xs bg-purple-600 hover:bg-purple-700 text-white font-medium"
+                        >
+                          {isFetchingNewCustGst ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            "Verify"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <Label className="text-xs font-medium">Trade Name (Firm) *</Label>
+                        <Input
+                          placeholder="e.g. NILKANTH ART"
+                          value={newCustTradeName}
+                          onChange={(e) => {
+                            setNewCustTradeName(e.target.value);
+                            setNewCustName(e.target.value);
+                          }}
+                          className="mt-1 uppercase font-semibold text-xs h-8"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs font-medium">Mobile *</Label>
+                        <Label className="text-xs font-medium">Legal Name (Proprietor)</Label>
                         <Input
-                          placeholder="97235 44545"
-                          value={newCustMobile}
-                          onChange={(e) => setNewCustMobile(e.target.value)}
-                          className="mt-1 font-mono font-normal"
+                          placeholder="e.g. ASHVIN THAKARSHIBHAI GOLKIYA"
+                          value={newCustLegalName}
+                          onChange={(e) => setNewCustLegalName(e.target.value)}
+                          className="mt-1 uppercase text-xs h-8"
                         />
                       </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium">Mobile Number *</Label>
+                      <Input
+                        placeholder="97235 44545"
+                        value={newCustMobile}
+                        onChange={(e) => setNewCustMobile(e.target.value)}
+                        className="mt-1 font-mono font-normal text-xs h-8"
+                      />
                     </div>
                     <div>
                       <Label className="text-xs font-medium">Address</Label>
@@ -1212,12 +1312,32 @@ function NewInvoiceContent() {
               {/* Auto-filled details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <Label className="text-[11px] text-muted-foreground font-normal">GSTIN</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] text-muted-foreground font-normal">GSTIN</Label>
+                    {customerGstin && customerGstin.trim().length === 15 && (
+                      <button
+                        type="button"
+                        onClick={() => handleLookupInvoiceCustGstin(customerGstin)}
+                        disabled={isFetchingInvoiceCustGst}
+                        className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        {isFetchingInvoiceCustGst ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        <span>Auto-Fill</span>
+                      </button>
+                    )}
+                  </div>
                   <Input
                     value={customerGstin}
-                    onChange={(e) => setCustomerGstin(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setCustomerGstin(val);
+                      const clean = val.replace(/[^A-Z0-9]/g, "");
+                      if (clean.length === 15) {
+                        handleLookupInvoiceCustGstin(clean);
+                      }
+                    }}
                     placeholder="24AEYPV3370E1Z1"
-                    className="font-mono font-normal uppercase mt-1 h-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-md"
+                    className="font-mono font-semibold uppercase mt-1 h-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-md"
                   />
                 </div>
                 <div>
@@ -1322,12 +1442,16 @@ function NewInvoiceContent() {
                         };
                       })
                     );
-                    const lastGst = invoices.find((i) => i.billType !== "raw")?.invoiceNo || "MTJ/144";
+                    const currentPrefix = (settings.invoicePrefix || "DTJ").trim();
+                    const lastGst = invoices.find(
+                      (i) => i.billType !== "raw" && i.invoiceNo && i.invoiceNo.startsWith(currentPrefix)
+                    )?.invoiceNo;
                     setInvoiceNo(
                       generateNextInvoiceNumber(
                         lastGst,
-                        settings.invoicePrefix || "MTJ",
-                        settings.financialYear || "2026-27"
+                        currentPrefix,
+                        settings.startingInvoiceNo || 1,
+                        settings.invoiceNumberPadding || 3
                       )
                     );
                     toast.info("Switched to Official GST Tax Invoice (GST applied)");
@@ -1767,7 +1891,7 @@ function NewInvoiceContent() {
                         {/* Quantity (Never truncated, plenty of width) */}
                         <div className="flex-1 min-w-[125px]">
                           <div className="text-[10px] font-semibold text-muted-foreground mb-1">
-                            Qty ({billType === "raw" ? "Unit" : "KG"})
+                            Qty ({billType === "raw" ? (row.unit || "Unit") : "KG"})
                           </div>
                           <Input
                             type="number"
@@ -1778,66 +1902,32 @@ function NewInvoiceContent() {
                               const qVal = e.target.value;
                               setItems((prev) => {
                                 const u = [...prev];
-                                const item = { ...u[index], quantity: qVal };
+                                const item = {
+                                  ...u[index],
+                                  quantity: qVal,
+                                  lastEditedField: "quantity" as const,
+                                };
                                 const qNum = Number(qVal) || 0;
+                                const rNum = Number(item.rate) || 0;
+                                const faNum = Number(item.finalAmount) || 0;
                                 const isRaw = billType === "raw";
                                 const gst = isRaw ? 0 : (item.gstRate || 0);
-                                const pppNum = Number(item.pricePerPiece) || 0;
-                                const faNum = Number(item.finalAmount) || 0;
-                                const rNum = Number(item.rate) || 0;
-
-                                const isFromTotal =
-                                  item.lastEditedField === "finalAmount" ||
-                                  (faNum > 0 && !item.pricePerPiece && !item.rate);
 
                                 if (qNum > 0) {
-                                  if (isFromTotal && faNum > 0) {
-                                    item.lastEditedField = "finalAmount";
-                                    if (isRaw) {
-                                      const r = (faNum / qNum).toFixed(2);
-                                      item.rate = r;
-                                      item.pricePerPiece = r;
-                                    } else {
-                                      item.pricePerPiece = (faNum / qNum).toFixed(2);
-                                      const baseTax = faNum / (1 + gst / 100);
-                                      item.rate = (baseTax / qNum).toFixed(4);
-                                    }
-                                  } else {
-                                    if (isRaw) {
-                                      const unitRate = pppNum > 0 ? pppNum : rNum;
-                                      if (unitRate > 0) {
-                                        item.rate = unitRate.toFixed(2);
-                                        item.pricePerPiece = unitRate.toFixed(2);
-                                        item.finalAmount = (qNum * unitRate).toFixed(2);
-                                      } else if (faNum > 0) {
-                                        const r = (faNum / qNum).toFixed(2);
-                                        item.rate = r;
-                                        item.pricePerPiece = r;
-                                        item.lastEditedField = "finalAmount";
-                                      }
-                                    } else {
-                                      if (pppNum > 0) {
-                                        const total = qNum * pppNum;
-                                        item.finalAmount = total.toFixed(2);
-                                        const baseTax = total / (1 + gst / 100);
-                                        item.rate = (baseTax / qNum).toFixed(4);
-                                      } else if (rNum > 0) {
-                                        const ppp = rNum * (1 + gst / 100);
-                                        item.pricePerPiece = ppp.toFixed(2);
-                                        item.finalAmount = (qNum * ppp).toFixed(2);
-                                      } else if (faNum > 0) {
-                                        item.pricePerPiece = (faNum / qNum).toFixed(2);
-                                        const baseTax = faNum / (1 + gst / 100);
-                                        item.rate = (baseTax / qNum).toFixed(4);
-                                        item.lastEditedField = "finalAmount";
-                                      }
-                                    }
+                                  if (rNum > 0) {
+                                    // User entered Rate earlier and now entered Qty -> calculate Total Amount!
+                                    // Neither Rate nor Qty is modified!
+                                    const taxable = qNum * rNum;
+                                    const total = isRaw ? taxable : taxable * (1 + gst / 100);
+                                    item.finalAmount = total.toFixed(2);
+                                  } else if (faNum > 0) {
+                                    // User entered Total earlier and now entered Qty -> calculate Rate!
+                                    // Neither Total nor Qty is modified!
+                                    const taxable = isRaw ? faNum : Math.round((faNum / (1 + gst / 100)) * 100) / 100;
+                                    item.rate = (taxable / qNum).toFixed(2);
                                   }
-                                } else {
-                                  if (isFromTotal) {
-                                    item.pricePerPiece = "";
-                                    item.rate = "";
-                                  } else {
+                                } else if (qVal === "") {
+                                  if (u[index].lastEditedField !== "finalAmount") {
                                     item.finalAmount = "";
                                   }
                                 }
@@ -1849,46 +1939,53 @@ function NewInvoiceContent() {
                           />
                         </div>
 
-                        {/* Price Per Piece (GST) / Unit Rate (Raw) */}
+                        {/* Rate (₹) */}
                         <div className="flex-1 min-w-[130px]">
-                          <div className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 mb-1">
-                            {billType === "raw" ? "Rate (₹)" : "Price/Pc (Incl. GST)"}
+                          <div className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 mb-1 flex items-center justify-between">
+                            <span>Rate (₹)</span>
+                            {row.suggestedRate && (
+                              <span className="text-[9px] text-purple-600 font-mono">
+                                Sug: {row.suggestedRate.toFixed(2)}
+                              </span>
+                            )}
                           </div>
                           <Input
                             type="number"
                             step="0.01"
-                            placeholder={billType === "raw" ? "Rate" : "0.00"}
-                            value={billType === "raw" ? (row.rate ?? row.pricePerPiece ?? "") : (row.pricePerPiece ?? "")}
+                            placeholder="0.00"
+                            value={row.rate}
                             onChange={(e) => {
-                              const pppVal = e.target.value;
+                              const rVal = e.target.value;
                               setItems((prev) => {
                                 const u = [...prev];
                                 const item = {
                                   ...u[index],
-                                  lastEditedField: "pricePerPiece" as const,
+                                  rate: rVal,
+                                  lastEditedField: "rate" as const,
                                 };
-                                const pppNum = Number(pppVal) || 0;
+                                const rNum = Number(rVal) || 0;
                                 const qNum = Number(item.quantity) || 0;
+                                const faNum = Number(item.finalAmount) || 0;
                                 const isRaw = billType === "raw";
                                 const gst = isRaw ? 0 : (item.gstRate || 0);
 
-                                if (isRaw) {
-                                  item.rate = pppVal;
-                                  item.pricePerPiece = pppVal;
-                                  if (pppNum > 0 && qNum > 0) {
-                                    item.finalAmount = (qNum * pppNum).toFixed(2);
-                                  } else if (pppVal === "") {
-                                    item.finalAmount = "";
+                                if (rNum > 0) {
+                                  if (faNum > 0 && (qNum === 0 || item.quantity === "" || item.quantity === "0" || u[index].lastEditedField === "finalAmount")) {
+                                    // EXACT USER REQUIREMENT:
+                                    // If Rate is entered and Total is entered:
+                                    // Qty should be count from deducted tax amount: (Total / (1 + gst/100)) / Rate
+                                    // e.g. 39302 / 1.05 = 37430.48 / 320 = 116.970 KG!
+                                    // Rate and Total amount are NEVER changed!
+                                    const taxable = isRaw ? faNum : Math.round((faNum / (1 + gst / 100)) * 100) / 100;
+                                    item.quantity = (taxable / rNum).toFixed(3);
+                                  } else if (qNum > 0) {
+                                    // Qty entered earlier -> calculate Total Amount!
+                                    const taxable = qNum * rNum;
+                                    const total = isRaw ? taxable : taxable * (1 + gst / 100);
+                                    item.finalAmount = total.toFixed(2);
                                   }
-                                } else {
-                                  item.pricePerPiece = pppVal;
-                                  if (pppNum > 0) {
-                                    item.rate = (pppNum / (1 + gst / 100)).toFixed(4);
-                                    if (qNum > 0) {
-                                      item.finalAmount = (qNum * pppNum).toFixed(2);
-                                    }
-                                  } else if (pppVal === "") {
-                                    item.rate = "";
+                                } else if (rVal === "") {
+                                  if (qNum > 0 && u[index].lastEditedField !== "finalAmount") {
                                     item.finalAmount = "";
                                   }
                                 }
@@ -1920,33 +2017,25 @@ function NewInvoiceContent() {
                                   lastEditedField: "finalAmount" as const,
                                 };
                                 const faNum = Number(faVal) || 0;
+                                const rNum = Number(item.rate) || 0;
                                 const qNum = Number(item.quantity) || 0;
                                 const isRaw = billType === "raw";
                                 const gst = isRaw ? 0 : (item.gstRate || 0);
 
                                 if (faNum > 0) {
-                                  if (isRaw) {
-                                    if (qNum > 0) {
-                                      const r = (faNum / qNum).toFixed(2);
-                                      item.rate = r;
-                                      item.pricePerPiece = r;
-                                    } else {
-                                      item.rate = "";
-                                      item.pricePerPiece = "";
-                                    }
-                                  } else {
-                                    if (qNum > 0) {
-                                      item.pricePerPiece = (faNum / qNum).toFixed(2);
-                                      const baseTax = faNum / (1 + gst / 100);
-                                      item.rate = (baseTax / qNum).toFixed(4);
-                                    } else {
-                                      item.pricePerPiece = "";
-                                      item.rate = "";
-                                    }
+                                  if (rNum > 0) {
+                                    // EXACT USER REQUIREMENT:
+                                    // If Rate is 320 and Total is 39302:
+                                    // Deducted tax amount = 39302 / 1.05 = 37430.48
+                                    // Quantity = 37430.48 / 320 = 116.970 KG!
+                                    // Neither Rate nor Total is changed automatically!
+                                    const taxable = isRaw ? faNum : Math.round((faNum / (1 + gst / 100)) * 100) / 100;
+                                    item.quantity = (taxable / rNum).toFixed(3);
+                                  } else if (qNum > 0) {
+                                    // Qty already entered -> calculate Rate!
+                                    const taxable = isRaw ? faNum : Math.round((faNum / (1 + gst / 100)) * 100) / 100;
+                                    item.rate = (taxable / qNum).toFixed(2);
                                   }
-                                } else if (faVal === "") {
-                                  item.pricePerPiece = "";
-                                  item.rate = "";
                                 }
                                 u[index] = item;
                                 return u;
@@ -1956,101 +2045,48 @@ function NewInvoiceContent() {
                           />
                         </div>
 
-                        {/* GST Specific Inputs: Base Rate & GST % */}
+                        {/* GST % Select (Hidden if raw bill) */}
                         {billType !== "raw" && (
-                          <>
-                            <div className="w-28 shrink-0">
-                              <div className="text-[10px] font-semibold text-muted-foreground mb-1 flex items-center justify-between">
-                                <span>Base Rate</span>
-                                {row.suggestedRate && (
-                                  <span className="text-[9px] text-purple-600 font-mono">
-                                    {row.suggestedRate.toFixed(2)}
-                                  </span>
-                                )}
-                              </div>
-                              <Input
-                                type="number"
-                                step="0.0001"
-                                placeholder="0.00"
-                                value={row.rate}
-                                onChange={(e) => {
-                                  const rVal = e.target.value;
-                                  setItems((prev) => {
-                                    const u = [...prev];
-                                    const item = {
-                                      ...u[index],
-                                      rate: rVal,
-                                      lastEditedField: "rate" as const,
-                                    };
-                                    const rNum = Number(rVal) || 0;
-                                    const qNum = Number(item.quantity) || 0;
-                                    const gst = item.gstRate || 0;
-
-                                    if (rNum > 0) {
-                                      const ppp = rNum * (1 + gst / 100);
-                                      item.pricePerPiece = ppp.toFixed(2);
-                                      if (qNum > 0) {
-                                        item.finalAmount = (qNum * ppp).toFixed(2);
-                                      }
-                                    } else if (rVal === "") {
-                                      item.pricePerPiece = "";
-                                      item.finalAmount = "";
-                                    }
-                                    u[index] = item;
-                                    return u;
-                                  });
-                                }}
-                                className="h-9 font-mono text-xs text-right px-2 rounded-md border-[#ececee] dark:border-[#2d2f39]"
-                              />
+                          <div className="w-24 shrink-0">
+                            <div className="text-[10px] font-semibold text-muted-foreground mb-1">
+                              GST %
                             </div>
+                            <select
+                              value={row.gstRate}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setItems((prev) => {
+                                  const u = [...prev];
+                                  const item = { ...u[index], gstRate: val };
+                                  const faNum = Number(item.finalAmount) || 0;
+                                  const rNum = Number(item.rate) || 0;
+                                  const qNum = Number(item.quantity) || 0;
 
-                            <div className="w-20 shrink-0">
-                              <div className="text-[10px] font-semibold text-muted-foreground mb-1">
-                                GST %
-                              </div>
-                              <select
-                                value={row.gstRate}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setItems((prev) => {
-                                    const u = [...prev];
-                                    const item = { ...u[index], gstRate: val };
-                                    const faNum = Number(item.finalAmount) || 0;
-                                    const pppNum = Number(item.pricePerPiece) || 0;
-                                    const rNum = Number(item.rate) || 0;
-                                    const qNum = Number(item.quantity) || 0;
-
-                                    if (item.lastEditedField === "finalAmount" && faNum > 0) {
-                                      const baseTax = faNum / (1 + val / 100);
-                                      if (qNum > 0) {
-                                        item.pricePerPiece = (faNum / qNum).toFixed(2);
-                                        item.rate = (baseTax / qNum).toFixed(4);
-                                      }
-                                    } else if (pppNum > 0) {
-                                      item.rate = (pppNum / (1 + val / 100)).toFixed(4);
-                                      if (qNum > 0) {
-                                        item.finalAmount = (qNum * pppNum).toFixed(2);
-                                      }
-                                    } else if (rNum > 0) {
-                                      const ppp = rNum * (1 + val / 100);
-                                      item.pricePerPiece = ppp.toFixed(2);
-                                      if (qNum > 0) {
-                                        item.finalAmount = (qNum * ppp).toFixed(2);
-                                      }
-                                    }
-                                    u[index] = item;
-                                    return u;
-                                  });
-                                }}
-                                className="h-9 w-full rounded-md border border-[#ececee] dark:border-[#2d2f39] bg-white dark:bg-[#181922] px-1 text-xs font-mono font-semibold"
-                              >
-                                <option value="5">5%</option>
-                                <option value="12">12%</option>
-                                <option value="18">18%</option>
-                                <option value="0">0%</option>
-                              </select>
-                            </div>
-                          </>
+                                  if (rNum > 0 && faNum > 0 && (item.lastEditedField === "finalAmount" || qNum === 0)) {
+                                    // Recalculate Qty from new GST rate
+                                    const taxable = Math.round((faNum / (1 + val / 100)) * 100) / 100;
+                                    item.quantity = (taxable / rNum).toFixed(3);
+                                  } else if (qNum > 0 && rNum > 0) {
+                                    // Recalculate Total from new GST rate
+                                    const taxable = qNum * rNum;
+                                    item.finalAmount = (taxable * (1 + val / 100)).toFixed(2);
+                                  } else if (qNum > 0 && faNum > 0) {
+                                    // Recalculate Rate from new GST rate
+                                    const taxable = Math.round((faNum / (1 + val / 100)) * 100) / 100;
+                                    item.rate = (taxable / qNum).toFixed(2);
+                                  }
+                                  u[index] = item;
+                                  return u;
+                                });
+                              }}
+                              className="h-9 w-full rounded-md border border-[#ececee] dark:border-[#2d2f39] bg-white dark:bg-[#181922] px-2 text-xs font-mono font-semibold"
+                            >
+                              <option value="5">5%</option>
+                              <option value="12">12%</option>
+                              <option value="18">18%</option>
+                              <option value="0">0%</option>
+                            </select>
+                          </div>
                         )}
                       </div>
 
@@ -2308,6 +2344,35 @@ function NewInvoiceContent() {
           </Card>
         </div>
       </div>
+
+      <OfficialGstModal
+        isOpen={isInvoiceGstModalOpen}
+        onClose={() => setIsInvoiceGstModalOpen(false)}
+        gstin={activeLookupGstin}
+        onSuccess={(data) => {
+          if (gstLookupTarget === "new_modal") {
+            if (data.tradeName) setNewCustTradeName(data.tradeName);
+            if (data.legalName) setNewCustLegalName(data.legalName);
+            if (data.tradeName || data.businessName) setNewCustName(data.tradeName || data.businessName);
+            if (data.address) setNewCustAddress(data.address);
+            if (data.city) setNewCustCity(data.city);
+            if (data.state) setNewCustState(data.state);
+            if (data.stateCode) setNewCustStateCode(data.stateCode);
+            if (data.gstin) setNewCustGstin(data.gstin);
+          } else {
+            const dispName = data.tradeName || data.businessName || data.legalName;
+            if (dispName) {
+              setCustomerName(dispName);
+              setCustomerSearch(dispName);
+            }
+            if (data.address) setCustomerAddress(data.address);
+            if (data.city) setCustomerCity(data.city);
+            if (data.state) setCustomerState(data.state);
+            if (data.stateCode) setCustomerStateCode(data.stateCode);
+            if (data.gstin) setCustomerGstin(data.gstin);
+          }
+        }}
+      />
     </div>
   );
 }

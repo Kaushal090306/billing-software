@@ -43,6 +43,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { InvoicePreviewModal } from "@/components/invoice/invoice-preview-modal";
+import { CustomerMonthlyLedgerModal } from "@/components/customer/customer-monthly-ledger-modal";
 import { toast } from "sonner";
 
 const GST_STATE_MAP: Record<string, string> = {
@@ -89,6 +90,9 @@ export default function CustomerProfilePage() {
   // Selected Invoice Preview
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Monthly Ledger Modal
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
 
   // Raw vs GST Bill Hierarchy Filter
   const [billTypeTab, setBillTypeTab] = useState<"all" | "gst" | "raw">("all");
@@ -371,68 +375,105 @@ export default function CustomerProfilePage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
-      {/* Top Breadcrumb & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link href="/customers">
+      {/* Top Breadcrumb & Actions Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-[#121016] p-4 sm:p-5 rounded-xl border border-[#ececee] dark:border-[#1a1822] shadow-2xs">
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
+          <Link href="/customers" className="shrink-0 mt-0.5 sm:mt-0">
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
-              className="h-9 w-9 rounded-md hover:bg-muted"
+              className="h-10 w-10 rounded-lg border-[#ececee] dark:border-[#2d2f39] hover:bg-muted shadow-2xs shrink-0 cursor-pointer"
+              title="Back to Customers"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground uppercase">
-              {customer.businessName}
-            </h1>
-            <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-              <span>GSTIN: <strong className="font-mono text-foreground font-semibold">{customer.gstin || "Unregistered"}</strong></span>
-              <span>&bull;</span>
-              <span>Mo: <strong className="font-mono text-foreground font-semibold">{customer.mobile}</strong></span>
-              <span>&bull;</span>
-              <span>{customer.city}, {customer.state}</span>
-            </p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground uppercase truncate">
+                {customer.businessName}
+              </h1>
+              {customer.tradeName && customer.tradeName !== customer.businessName && (
+                <Badge
+                  variant="outline"
+                  className="text-[11px] font-medium uppercase bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border-purple-200"
+                >
+                  Trade: {customer.tradeName}
+                </Badge>
+              )}
+            </div>
+
+            {/* Clean Badges & Metadata Row */}
+            <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 font-mono text-[11px] font-medium text-foreground">
+                <span className="text-muted-foreground text-[10px] font-sans uppercase font-semibold">GSTIN</span>
+                <strong className="text-purple-700 dark:text-purple-300 font-semibold">{customer.gstin || "Unregistered"}</strong>
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 font-mono text-[11px] font-medium text-foreground">
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                <span>{customer.mobile}</span>
+              </span>
+
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] font-medium text-muted-foreground">
+                <MapPin className="h-3 w-3 text-muted-foreground" />
+                <span>{customer.city}, {customer.state}</span>
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Action Buttons */}
+        <div className="flex items-center flex-wrap gap-2 shrink-0">
+          <Button
+            onClick={() => setIsLedgerModalOpen(true)}
+            variant="outline"
+            size="sm"
+            className="h-9 px-3 rounded-md border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 font-semibold text-xs cursor-pointer shadow-2xs"
+          >
+            <FileText className="h-3.5 w-3.5 mr-1.5 text-indigo-600" />
+            <span>Monthly Ledger</span>
+          </Button>
+
           <Button
             onClick={handleOpenEdit}
             variant="outline"
-            className="h-10 px-4 rounded-md border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold text-xs sm:text-sm cursor-pointer"
+            size="sm"
+            className="h-9 px-3 rounded-md border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold text-xs cursor-pointer shadow-2xs"
           >
-            <Pencil className="h-4 w-4 mr-1.5" />
+            <Pencil className="h-3.5 w-3.5 mr-1.5" />
             <span>Edit Customer</span>
           </Button>
 
           <Button
             onClick={() => setIsPayOpen(true)}
             variant="outline"
-            className="h-10 px-4 rounded-md border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-semibold text-xs sm:text-sm cursor-pointer"
+            size="sm"
+            className="h-9 px-3 rounded-md border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-semibold text-xs cursor-pointer shadow-2xs"
           >
-            <CreditCard className="h-4 w-4 mr-1.5" />
+            <CreditCard className="h-3.5 w-3.5 mr-1.5" />
             <span>Record Payment</span>
           </Button>
 
           <Button
             asChild
             variant="outline"
-            className="h-10 px-3 rounded-md border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 font-semibold text-xs sm:text-sm"
+            size="sm"
+            className="h-9 px-3 rounded-md border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 font-semibold text-xs shadow-2xs"
           >
             <Link href={`/invoices/new?customerId=${customer.id}&billType=raw`}>
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-3.5 w-3.5 mr-1" />
               <span>New Raw Bill</span>
             </Link>
           </Button>
 
           <Button
             asChild
-            className="h-10 px-4 rounded-md bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-md text-xs sm:text-sm"
+            size="sm"
+            className="h-9 px-3.5 rounded-md bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold shadow-xs text-xs"
           >
             <Link href={`/invoices/new?customerId=${customer.id}`}>
-              <Plus className="h-4 w-4 mr-1.5" />
+              <Plus className="h-3.5 w-3.5 mr-1" />
               <span>Create GST Bill</span>
             </Link>
           </Button>
@@ -871,14 +912,25 @@ export default function CustomerProfilePage() {
               <CardTitle className="text-sm font-semibold text-foreground">
                 Statement of Accounts & Payments Ledger
               </CardTitle>
-              <Button
-                onClick={() => setIsPayOpen(true)}
-                size="sm"
-                className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                <span>Record Payment</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setIsLedgerModalOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-semibold border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1 text-indigo-600" />
+                  <span>Monthly Ledger Statement</span>
+                </Button>
+                <Button
+                  onClick={() => setIsPayOpen(true)}
+                  size="sm"
+                  className="h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  <span>Record Payment</span>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -1013,6 +1065,13 @@ export default function CustomerProfilePage() {
         settings={settings}
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
+      />
+
+      {/* Customer Monthly Ledger Modal */}
+      <CustomerMonthlyLedgerModal
+        isOpen={isLedgerModalOpen}
+        onClose={() => setIsLedgerModalOpen(false)}
+        customer={customer}
       />
 
       {/* Record Payment Dialog */}

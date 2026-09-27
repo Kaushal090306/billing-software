@@ -22,15 +22,24 @@ import {
   FilePlus2,
   FileText,
   CreditCard,
+  Mail,
+  MapPin,
   Building2,
   Phone,
   ChevronRight,
   Pencil,
   Trash2,
-  Mail,
-  MapPin,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  ShieldCheck,
+  ExternalLink,
+  ClipboardPaste,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
+import { OfficialGstModal } from "@/components/gst/official-gst-modal";
+import { CustomerMonthlyLedgerModal } from "@/components/customer/customer-monthly-ledger-modal";
 
 const GST_STATE_MAP: Record<string, string> = {
   "01": "Jammu and Kashmir",
@@ -70,6 +79,8 @@ export default function CustomersPage() {
 
   // Form Fields
   const [name, setName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [legalName, setLegalName] = useState("");
   const [contact, setContact] = useState("");
   const [gstin, setGstin] = useState("");
   const [mobile, setMobile] = useState("");
@@ -81,6 +92,10 @@ export default function CustomersPage() {
   const [pincode, setPincode] = useState("395002");
   const [openingBalance, setOpeningBalance] = useState("0");
   const [notes, setNotes] = useState("");
+
+  // Official GST Verification State
+  const [isFetchingGst, setIsFetchingGst] = useState(false);
+  const [gstVerifiedData, setGstVerifiedData] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -97,6 +112,8 @@ export default function CustomersPage() {
   const handleOpenAdd = () => {
     setEditingCustomer(null);
     setName("");
+    setTradeName("");
+    setLegalName("");
     setContact("");
     setGstin("");
     setMobile("");
@@ -114,6 +131,8 @@ export default function CustomersPage() {
   const handleOpenEdit = (cust: Customer) => {
     setEditingCustomer(cust);
     setName(cust.businessName || "");
+    setTradeName(cust.tradeName || cust.businessName || "");
+    setLegalName(cust.legalName || cust.contactPerson || "");
     setContact(cust.contactPerson || "");
     setGstin(cust.gstin || "");
     setMobile(cust.mobile || "");
@@ -128,6 +147,76 @@ export default function CustomersPage() {
     setIsOpen(true);
   };
 
+  const [isPastingGst, setIsPastingGst] = useState(false);
+  const [showPasteBox, setShowPasteBox] = useState(false);
+  const [pastedGstText, setPastedGstText] = useState("");
+  const [isOfficialModalOpen, setIsOfficialModalOpen] = useState(false);
+
+  // Customer Monthly Ledger Modal
+  const [selectedLedgerCustomer, setSelectedLedgerCustomer] = useState<Customer | null>(null);
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+
+  const handleOpenOfficialGstPortal = () => {
+    const clean = gstin.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (clean) {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        navigator.clipboard.writeText(clean);
+      }
+      toast.success(`Copied GSTIN (${clean}) to clipboard! Opening official GST portal...`);
+    } else {
+      toast.info("Opening official GST portal (services.gst.gov.in)...");
+    }
+    window.open("https://services.gst.gov.in/services/searchtp", "_blank", "noopener,noreferrer");
+  };
+
+  const handleProcessPastedGst = async (textToParse: string) => {
+    if (!textToParse.trim()) {
+      toast.error("Please paste text from the official GST portal");
+      return;
+    }
+    setIsPastingGst(true);
+    try {
+      const res = await fetch("/api/gst-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText: textToParse }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.gstin) setGstin(data.gstin);
+        if (data.tradeName) setTradeName(data.tradeName);
+        if (data.legalName) setLegalName(data.legalName);
+        if (data.tradeName || data.businessName) setName(data.tradeName || data.businessName);
+        if (data.legalName || data.contactPerson) setContact(data.legalName || data.contactPerson);
+        if (data.address) setAddress(data.address);
+        if (data.city) setCity(data.city);
+        if (data.state) setState(data.state);
+        if (data.stateCode) setStateCode(data.stateCode);
+        if (data.pincode) setPincode(data.pincode);
+        setGstVerifiedData(data);
+        setShowPasteBox(false);
+        setPastedGstText("");
+        toast.success(`✓ Official GST Details Extracted: ${data.tradeName || data.businessName || data.gstin}`);
+      } else {
+        toast.error(data.error || "Could not parse GST details from text");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process text");
+    } finally {
+      setIsPastingGst(false);
+    }
+  };
+
+  const handleAutoLookupGstin = async (gstinToLookup: string) => {
+    const clean = gstinToLookup.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (clean.length < 15) {
+      toast.error("Please enter a full 15-digit GSTIN number");
+      return;
+    }
+    // Open Official Live Portal Verification Modal
+    setIsOfficialModalOpen(true);
+  };
+
   const handleGstinChange = (value: string) => {
     const val = value.toUpperCase();
     setGstin(val);
@@ -138,11 +227,19 @@ export default function CustomersPage() {
         setState(GST_STATE_MAP[code]);
       }
     }
+    // Auto lookup when exact 15 alphanumeric characters are entered
+    const clean = val.replace(/[^A-Z0-9]/g, "");
+    if (clean.length === 15) {
+      handleAutoLookupGstin(clean);
+    } else {
+      setGstVerifiedData(null);
+    }
   };
 
   const handleSaveCustomer = () => {
-    if (!name.trim() || !mobile.trim()) {
-      toast.error("Please enter Business / Firm Name and Mobile Number");
+    const effectiveTrade = tradeName.trim() || name.trim() || legalName.trim();
+    if (!effectiveTrade || !mobile.trim()) {
+      toast.error("Please enter Business / Trade Name and Mobile Number");
       return;
     }
 
@@ -153,15 +250,17 @@ export default function CustomersPage() {
     if (editingCustomer) {
       const updatedCust: Customer = {
         ...editingCustomer,
-        businessName: name.trim().toUpperCase(),
-        contactPerson: contact.trim() || name.trim().toUpperCase(),
+        businessName: effectiveTrade.toUpperCase(),
+        tradeName: (tradeName.trim() || effectiveTrade).toUpperCase(),
+        legalName: legalName.trim().toUpperCase(),
+        contactPerson: contact.trim() || legalName.trim() || effectiveTrade.toUpperCase(),
         gstin: cleanGstin,
         pan: pan,
         address: address.trim().toUpperCase(),
         city: city.trim().toUpperCase(),
         state: state.trim(),
         stateCode: stateCode.trim(),
-        pincode: pincode.trim() || "395002",
+        pincode: pincode.trim() || "395010",
         mobile: mobile.trim(),
         email: email.trim(),
         openingBalance: opBal,
@@ -176,15 +275,17 @@ export default function CustomersPage() {
     } else {
       const newCust: Customer = {
         id: `cust_${Date.now()}`,
-        businessName: name.trim().toUpperCase(),
-        contactPerson: contact.trim() || name.trim().toUpperCase(),
+        businessName: effectiveTrade.toUpperCase(),
+        tradeName: (tradeName.trim() || effectiveTrade).toUpperCase(),
+        legalName: legalName.trim().toUpperCase(),
+        contactPerson: contact.trim() || legalName.trim() || effectiveTrade.toUpperCase(),
         gstin: cleanGstin,
         pan: pan,
         address: address.trim().toUpperCase(),
         city: city.trim().toUpperCase(),
         state: state.trim(),
         stateCode: stateCode.trim(),
-        pincode: pincode.trim() || "395002",
+        pincode: pincode.trim() || "395010",
         mobile: mobile.trim(),
         email: email.trim(),
         openingBalance: opBal,
@@ -412,7 +513,22 @@ export default function CustomersPage() {
                               <span>Edit</span>
                             </Button>
 
-                            {/* View Ledger & Invoices */}
+                            {/* Monthly Ledger Statement */}
+                            <Button
+                              onClick={() => {
+                                setSelectedLedgerCustomer(cust);
+                                setIsLedgerModalOpen(true);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2 text-xs font-medium border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-md cursor-pointer"
+                              title="Download / View Monthly Statement & Ledger PDF"
+                            >
+                              <FileText className="h-3.5 w-3.5 mr-1 text-indigo-600" />
+                              <span>Ledger</span>
+                            </Button>
+
+                            {/* View Customer Details */}
                             <Button
                               asChild
                               variant="outline"
@@ -420,7 +536,7 @@ export default function CustomersPage() {
                               className="h-8 px-2 text-xs font-medium border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-300 rounded-md"
                             >
                               <Link href={`/customers/${cust.id}`}>
-                                <span>Ledger</span>
+                                <span>Profile</span>
                                 <ChevronRight className="h-3 w-3 ml-1" />
                               </Link>
                             </Button>
@@ -484,23 +600,180 @@ export default function CustomersPage() {
           </DialogHeader>
 
           <div className="space-y-3.5 py-2 text-xs">
-            <div>
-              <Label className="text-xs font-semibold text-foreground">
-                Business / Firm Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                placeholder="e.g. SHREE MANGALAM THREAD & JARI"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 uppercase font-semibold h-9 rounded-md"
-              />
+            {/* GSTIN First with Auto-Fetch Badge */}
+            <div className="p-3 bg-purple-50/60 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-purple-600" />
+                  <span>GSTIN Number (Official Auto-Check)</span>
+                </Label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenOfficialGstPortal}
+                    className="text-[10px] text-purple-700 dark:text-purple-300 font-semibold hover:underline flex items-center gap-1 cursor-pointer bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-700 shadow-2xs"
+                    title="Open official government portal (services.gst.gov.in/services/searchtp)"
+                  >
+                    <span>Official Portal</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPasteBox(!showPasteBox)}
+                    className="text-[10px] text-purple-600 dark:text-purple-400 font-medium hover:underline cursor-pointer"
+                  >
+                    {showPasteBox ? "Hide Paste Tool" : "Paste from Portal"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. 24ASVPG5889L1ZR"
+                  value={gstin}
+                  onChange={(e) => handleGstinChange(e.target.value)}
+                  className="font-mono uppercase font-bold text-xs h-9 bg-white dark:bg-zinc-900 border-purple-300 dark:border-purple-700 flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleAutoLookupGstin(gstin)}
+                  disabled={isFetchingGst || !gstin || gstin.trim().length < 15}
+                  className="h-9 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs gap-1.5 cursor-pointer shrink-0"
+                >
+                  {isFetchingGst ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Checking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Auto Fetch</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Paste helper box if user copied taxpayer text from the official portal */}
+              {showPasteBox && (
+                <div className="p-2.5 bg-white dark:bg-zinc-900 rounded-md border border-purple-200 dark:border-purple-700 space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">
+                    <span>Paste text or details copied from official GST Portal:</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const clip = await navigator.clipboard.readText();
+                          if (clip) {
+                            setPastedGstText(clip);
+                            handleProcessPastedGst(clip);
+                          }
+                        } catch {
+                          toast.error("Clipboard permission denied. Please paste manually.");
+                        }
+                      }}
+                      className="text-[10px] text-purple-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <ClipboardPaste className="h-3 w-3" />
+                      <span>Paste from Clipboard</span>
+                    </button>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={pastedGstText}
+                    onChange={(e) => setPastedGstText(e.target.value)}
+                    placeholder="e.g. Legal Name: NILKANTH ART, Trade Name: NILKANTH YARN, Principal Place: SHOP NO.1, JAY NARAYAN IND.-1, ANJANA FARM..."
+                    className="w-full text-xs font-mono p-2 border border-border rounded bg-zinc-50 dark:bg-zinc-800 outline-none resize-none"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowPasteBox(false)}
+                      className="h-7 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handleProcessPastedGst(pastedGstText)}
+                      disabled={isPastingGst || !pastedGstText.trim()}
+                      className="h-7 text-xs bg-purple-600 text-white hover:bg-purple-700"
+                    >
+                      {isPastingGst ? <Loader2 className="h-3 w-3 animate-spin" /> : "Extract & Fill"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Verified Feedback Banner */}
+              {gstVerifiedData && (
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-300 dark:border-emerald-800 flex items-center justify-between text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <div className="font-bold uppercase text-xs">
+                        {gstVerifiedData.tradeName || gstVerifiedData.businessName}
+                      </div>
+                      {gstVerifiedData.legalName && (
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                          Proprietor / Legal: {gstVerifiedData.legalName}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline" className="text-[9.5px] font-mono border-emerald-400 text-emerald-700 dark:text-emerald-300">
+                      PAN: {gstVerifiedData.pan}
+                    </Badge>
+                    <div className="text-[9.5px] text-emerald-600 font-semibold mt-0.5">
+                      {gstVerifiedData.status || "ACTIVE"}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Trade Name & Legal Name Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold text-foreground">
+                  Trade Name (Firm / Brand) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  placeholder="e.g. NILKANTH ART"
+                  value={tradeName}
+                  onChange={(e) => {
+                    setTradeName(e.target.value);
+                    setName(e.target.value);
+                  }}
+                  className="mt-1 uppercase font-semibold h-9 rounded-md"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-foreground">
+                  Legal Name (Proprietor / Company)
+                </Label>
+                <Input
+                  placeholder="e.g. ASHVIN THAKARSHIBHAI GOLKIYA"
+                  value={legalName}
+                  onChange={(e) => {
+                    setLegalName(e.target.value);
+                    if (!contact) setContact(e.target.value);
+                  }}
+                  className="mt-1 uppercase h-9 rounded-md"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-semibold text-foreground">Contact Person</Label>
                 <Input
-                  placeholder="e.g. Ketan Bhai"
+                  placeholder="e.g. Ketan Bhai / Representative"
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
                   className="mt-1 h-9 rounded-md"
@@ -521,15 +794,13 @@ export default function CustomersPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                  <span>GSTIN</span>
-                  <span className="text-[10px] text-muted-foreground font-normal">Auto state extract</span>
-                </Label>
+                <Label className="text-xs font-semibold text-foreground">Email Address</Label>
                 <Input
-                  placeholder="24AEYPV3370E1Z1"
-                  value={gstin}
-                  onChange={(e) => handleGstinChange(e.target.value)}
-                  className="mt-1 font-mono uppercase font-semibold h-9 rounded-md"
+                  type="email"
+                  placeholder="customer@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mt-1 h-9 rounded-md"
                 />
               </div>
               <div>
@@ -547,9 +818,9 @@ export default function CustomersPage() {
             </div>
 
             <div>
-              <Label className="text-xs font-semibold text-foreground">Address</Label>
+              <Label className="text-xs font-semibold text-foreground">Address (Principal Place of Business)</Label>
               <Input
-                placeholder="Shop No.1, Jay Narayan Ind.-1, Anjana Farm"
+                placeholder="2nd Floor, 104, Orange Embroidery Park, Surat Kadodara Road"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 className="mt-1 uppercase h-9 rounded-md"
@@ -583,26 +854,14 @@ export default function CustomersPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-semibold text-foreground">Pincode</Label>
-                <Input
-                  placeholder="395002"
-                  value={pincode}
-                  onChange={(e) => setPincode(e.target.value)}
-                  className="mt-1 font-mono h-9 rounded-md"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-foreground">Email (Optional)</Label>
-                <Input
-                  type="email"
-                  placeholder="party@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 h-9 rounded-md"
-                />
-              </div>
+            <div>
+              <Label className="text-xs font-semibold text-foreground">Pincode</Label>
+              <Input
+                placeholder="395010"
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                className="mt-1 font-mono h-9 rounded-md"
+              />
             </div>
 
             <div>
@@ -635,6 +894,33 @@ export default function CustomersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Official GST Portal Live Captcha Verification Modal */}
+      <OfficialGstModal
+        isOpen={isOfficialModalOpen}
+        onClose={() => setIsOfficialModalOpen(false)}
+        gstin={gstin}
+        onSuccess={(data) => {
+          if (data.gstin) setGstin(data.gstin);
+          if (data.tradeName) setTradeName(data.tradeName);
+          if (data.legalName) setLegalName(data.legalName);
+          if (data.tradeName || data.businessName) setName(data.tradeName || data.businessName);
+          if (data.legalName || data.contactPerson) setContact(data.legalName || data.contactPerson || "");
+          if (data.address) setAddress(data.address);
+          if (data.city) setCity(data.city);
+          if (data.state) setState(data.state);
+          if (data.stateCode) setStateCode(data.stateCode);
+          if (data.pincode) setPincode(data.pincode);
+          setGstVerifiedData(data);
+        }}
+      />
+
+      {/* Customer Monthly Ledger Modal */}
+      <CustomerMonthlyLedgerModal
+        isOpen={isLedgerModalOpen}
+        onClose={() => setIsLedgerModalOpen(false)}
+        customer={selectedLedgerCustomer}
+      />
     </div>
   );
 }

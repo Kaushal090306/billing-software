@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { generateNextInvoiceNumber } from "@/lib/billing-utils";
 import {
   Building2,
   Landmark,
@@ -111,6 +112,11 @@ export default function SettingsPage() {
 
   const [liveSettingsUpiQr, setLiveSettingsUpiQr] = useState<string>("");
 
+  // GST Verification Test State
+  const [testGstin, setTestGstin] = useState("24ASVPG5889L1ZR");
+  const [isTestingGst, setIsTestingGst] = useState(false);
+  const [gstTestResult, setGstTestResult] = useState<any>(null);
+
   useEffect(() => {
     if (settings.upiId && settings.upiId.trim().length > 0) {
       const upiString = `upi://pay?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(settings.companyName || "Company")}&cu=INR`;
@@ -148,7 +154,12 @@ export default function SettingsPage() {
   // Sample Mock Invoice for Live Designer Preview
   const sampleInvoice: Invoice = {
     id: "sample_inv_101",
-    invoiceNo: "MTJ/145",
+    invoiceNo: generateNextInvoiceNumber(
+      undefined,
+      settings.invoicePrefix || "DTJ",
+      settings.startingInvoiceNo || 1,
+      settings.invoiceNumberPadding || 3
+    ),
     date: new Date().toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "2-digit",
@@ -1823,7 +1834,8 @@ export default function SettingsPage() {
       {/* TAB 2: COMPANY PROFILE & DETAILS                                         */}
       {/* ========================================================================= */}
       {activeTab === "company" && (
-        <Card className="border-border shadow-xs">
+        <div className="space-y-5">
+          <Card className="border-border shadow-xs">
           <CardHeader className="pb-3 border-b border-border">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Building2 className="h-4 w-4 text-blue-600" />
@@ -1952,6 +1964,233 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Invoice Numbering & Prefix Configuration Card */}
+        <Card className="border-border shadow-xs mt-5">
+          <CardHeader className="pb-3 border-b border-border">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-purple-600" />
+                  <span>Invoice Numbering &amp; Prefix Format</span>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Configure your bill number prefix (e.g. DTJ), starting sequence, and digit padding.
+                </CardDescription>
+              </div>
+              <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-mono text-xs w-fit">
+                Next: {generateNextInvoiceNumber(undefined, settings.invoicePrefix || "DTJ", settings.startingInvoiceNo || 1, settings.invoiceNumberPadding || 3)}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4 text-xs">
+            {/* Quick Presets */}
+            <div>
+              <Label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                Quick Format Presets:
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "DTJ/001 (Recommended)", prefix: "DTJ", start: 1, pad: 3 },
+                  { label: "DTJ-001", prefix: "DTJ-", start: 1, pad: 3 },
+                  { label: "DTJ/26-27/001", prefix: "DTJ/26-27", start: 1, pad: 3 },
+                  { label: "DTJ/1 (No zero pad)", prefix: "DTJ", start: 1, pad: 1 },
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setSettings({
+                        ...settings,
+                        invoicePrefix: preset.prefix,
+                        startingInvoiceNo: preset.start,
+                        invoiceNumberPadding: preset.pad,
+                      });
+                      toast.info(`Format set to ${preset.label}`);
+                    }}
+                    className="px-2.5 py-1 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[11px] font-mono hover:bg-purple-100 dark:hover:bg-purple-900/60 cursor-pointer transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Invoice Prefix (e.g. DTJ or DTJ/001) *</Label>
+                <Input
+                  value={settings.invoicePrefix || "DTJ"}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    // If user enters DTJ/001 directly, handle intelligently
+                    const m = val.match(/^(.*?)[\/\-_]?(\d+)$/);
+                    if (m && m[1]) {
+                      setSettings({
+                        ...settings,
+                        invoicePrefix: val,
+                        startingInvoiceNo: parseInt(m[2], 10),
+                        invoiceNumberPadding: m[2].length,
+                      });
+                    } else {
+                      setSettings({ ...settings, invoicePrefix: val });
+                    }
+                  }}
+                  placeholder="DTJ"
+                  className="h-9 text-xs font-mono font-bold uppercase"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Starting Number *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={settings.startingInvoiceNo || 1}
+                  onChange={(e) => setSettings({ ...settings, startingInvoiceNo: parseInt(e.target.value, 10) || 1 })}
+                  className="h-9 text-xs font-mono font-bold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Digit Padding Length</Label>
+                <select
+                  value={settings.invoiceNumberPadding || 3}
+                  onChange={(e) => setSettings({ ...settings, invoiceNumberPadding: parseInt(e.target.value, 10) || 3 })}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs font-mono"
+                >
+                  <option value="3">3 digits (001, 002, 003...)</option>
+                  <option value="4">4 digits (0001, 0002...)</option>
+                  <option value="2">2 digits (01, 02...)</option>
+                  <option value="1">1 digit - No leading zeros (1, 2, 3...)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Live Sequence Preview Display */}
+            <div className="p-3 bg-muted/40 rounded-lg border border-border flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span className="text-[11px] text-muted-foreground block">Number Sequence Preview:</span>
+                <span className="font-mono text-xs font-bold text-foreground">
+                  {generateNextInvoiceNumber(undefined, settings.invoicePrefix || "DTJ", settings.startingInvoiceNo || 1, settings.invoiceNumberPadding || 3)}
+                  {" → "}
+                  {generateNextInvoiceNumber(
+                    generateNextInvoiceNumber(undefined, settings.invoicePrefix || "DTJ", settings.startingInvoiceNo || 1, settings.invoiceNumberPadding || 3),
+                    settings.invoicePrefix || "DTJ",
+                    settings.startingInvoiceNo || 1,
+                    settings.invoiceNumberPadding || 3
+                  )}
+                  {" → "}
+                  {generateNextInvoiceNumber(
+                    generateNextInvoiceNumber(
+                      generateNextInvoiceNumber(undefined, settings.invoicePrefix || "DTJ", settings.startingInvoiceNo || 1, settings.invoiceNumberPadding || 3),
+                      settings.invoicePrefix || "DTJ",
+                      settings.startingInvoiceNo || 1,
+                      settings.invoiceNumberPadding || 3
+                    ),
+                    settings.invoicePrefix || "DTJ",
+                    settings.startingInvoiceNo || 1,
+                    settings.invoiceNumberPadding || 3
+                  )}
+                </span>
+              </div>
+              <Badge variant="outline" className="text-[11px] font-mono text-emerald-600 border-emerald-300 dark:border-emerald-800">
+                ✓ Auto-increment Ready
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Official GSTIN Verification Integration Card */}
+        <Card className="border-border shadow-xs mt-5">
+          <CardHeader className="pb-3 border-b border-border">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <span>Official GSTIN Verification &amp; Auto-Fill Integration</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              When adding a customer, entering their 15-character GSTIN automatically extracts business name, PAN, state, and address.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">GST Verification API Key (Optional)</Label>
+              <Input
+                type="password"
+                placeholder="Enter Appyflow or RapidAPI key (Optional - Built-in decoder active by default)"
+                value={settings.gstApiKey || ""}
+                onChange={(e) => setSettings({ ...settings, gstApiKey: e.target.value })}
+                className="h-9 text-xs font-mono"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Leave blank to use the built-in GSTIN validation and State/PAN extractor, or provide an Appyflow / GSP key for live real-time government database lookups.
+              </p>
+            </div>
+
+            {/* Live Test Tool */}
+            <div className="p-3 bg-muted/40 rounded-lg border border-border space-y-2.5">
+              <div className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                <span>Test GST Lookup Portal Integration:</span>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={testGstin}
+                  onChange={(e) => setTestGstin(e.target.value.toUpperCase())}
+                  placeholder="24ASVPG5889L1ZR"
+                  className="h-8 font-mono text-xs uppercase flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={async () => {
+                    if (!testGstin || testGstin.length < 15) {
+                      toast.error("Please enter 15-digit GSTIN to test");
+                      return;
+                    }
+                    setIsTestingGst(true);
+                    setGstTestResult(null);
+                    try {
+                      const res = await fetch(`/api/gst-lookup?gstin=${encodeURIComponent(testGstin.trim())}`);
+                      const d = await res.json();
+                      if (d.success) {
+                        setGstTestResult(d);
+                        toast.success(`Verified: ${d.businessName || d.entityType}`);
+                      } else {
+                        toast.error(d.error || "Lookup failed");
+                      }
+                    } catch (e: any) {
+                      toast.error(e.message || "Failed to query GST API");
+                    } finally {
+                      setIsTestingGst(false);
+                    }
+                  }}
+                  disabled={isTestingGst}
+                  className="h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold cursor-pointer shrink-0"
+                >
+                  {isTestingGst ? "Checking..." : "Verify GSTIN"}
+                </Button>
+              </div>
+
+              {gstTestResult && (
+                <div className="p-2.5 bg-background rounded border border-purple-200 dark:border-purple-800 space-y-1 text-[11px] font-mono">
+                  <div className="flex justify-between items-center text-emerald-600 font-bold">
+                    <span>✓ Status: {gstTestResult.status}</span>
+                    <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">
+                      {gstTestResult.source}
+                    </Badge>
+                  </div>
+                  <div><span className="text-muted-foreground">Entity:</span> {gstTestResult.entityType}</div>
+                  <div><span className="text-muted-foreground">State:</span> {gstTestResult.state} ({gstTestResult.stateCode})</div>
+                  <div><span className="text-muted-foreground">PAN:</span> {gstTestResult.pan}</div>
+                  {gstTestResult.businessName && <div><span className="text-muted-foreground">Name:</span> {gstTestResult.businessName}</div>}
+                  {gstTestResult.address && <div><span className="text-muted-foreground">Address:</span> {gstTestResult.address}</div>}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        </div>
       )}
 
       {/* ========================================================================= */}
