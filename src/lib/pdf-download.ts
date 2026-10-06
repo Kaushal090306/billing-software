@@ -113,34 +113,58 @@ export interface WhatsAppInvoiceShareParams {
 }
 
 /**
- * Generates the Invoice PDF and shares it directly to WhatsApp.
+ * Generates the Invoice PDF, copies the customer mobile number to clipboard for easy pasting in WhatsApp search bar, and opens WhatsApp.
  * - On Mobile / Web Share API: Attaches the actual PDF file to the share sheet.
- * - On Desktop browsers without file sharing: Automatically downloads the PDF and opens WhatsApp chat for 1-click drag & drop.
+ * - On Desktop browsers without file sharing: Automatically copies mobile number to clipboard, downloads PDF, and opens WhatsApp.
  */
 export async function shareInvoicePDFOnWhatsApp({
   elementIdOrRef,
   invoice,
   companyName = "DHARMI THREAD & JARI",
   filename,
-}: WhatsAppInvoiceShareParams): Promise<{ sharedVia: "native_share" | "download_and_whatsapp"; filename: string }> {
+}: WhatsAppInvoiceShareParams): Promise<{
+  sharedVia: "native_share" | "download_and_whatsapp";
+  filename: string;
+  copiedMobile?: string;
+}> {
   const safeInvoiceName = (invoice.invoiceNo || "Invoice").replace(/[\/\\]/g, "_");
   const targetFilename = filename || `SaleBill_${safeInvoiceName}.pdf`;
 
-  // 1. Generate pristine high-resolution PDF File
+  // 1. Clean & prepare customer mobile number for copying & WhatsApp URL
+  const rawMobile = (invoice.customerMobile || "").trim();
+  const cleanMobileDigits = rawMobile.replace(/\D/g, "");
+  const tenDigitMobile =
+    cleanMobileDigits.length === 10
+      ? cleanMobileDigits
+      : cleanMobileDigits.startsWith("91") && cleanMobileDigits.length === 12
+      ? cleanMobileDigits.slice(2)
+      : cleanMobileDigits;
+  const formattedMobile = cleanMobileDigits.startsWith("91")
+    ? cleanMobileDigits
+    : cleanMobileDigits.length === 10
+    ? `91${cleanMobileDigits}`
+    : cleanMobileDigits;
+
+  const phoneToCopy = tenDigitMobile || rawMobile;
+
+  // 2. Automatically copy mobile number to clipboard
+  if (phoneToCopy && typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(phoneToCopy);
+    } catch (clipErr) {
+      console.warn("Failed to copy mobile number to clipboard:", clipErr);
+    }
+  }
+
+  // 3. Generate pristine high-resolution PDF File
   const { pdf, file, filename: safeFilename } = await generateInvoicePDF(
     elementIdOrRef,
     targetFilename
   );
 
-  // 2. Format WhatsApp message
+  // 4. Format WhatsApp message
   const isGst = invoice.billType !== "raw";
   const docTitle = isGst ? "Tax Invoice" : "Sale Bill";
-  const cleanMobile = (invoice.customerMobile || "").replace(/\D/g, "");
-  const formattedMobile = cleanMobile.startsWith("91")
-    ? cleanMobile
-    : cleanMobile.length === 10
-    ? `91${cleanMobile}`
-    : cleanMobile;
 
   const message =
     `*${docTitle} from ${companyName}*\n\n` +
@@ -152,7 +176,7 @@ export async function shareInvoicePDFOnWhatsApp({
     `Thank you for your business!\n` +
     `Mo: 99256 06480 | Surat, Gujarat`;
 
-  // 3. Try Native Web Share API with File (Mobile Devices & supported desktop browsers)
+  // 5. Try Native Web Share API with File (Mobile Devices & supported desktop browsers)
   if (
     typeof navigator !== "undefined" &&
     typeof navigator.share === "function" &&
@@ -165,29 +189,29 @@ export async function shareInvoicePDFOnWhatsApp({
           title: `${docTitle} - ${invoice.invoiceNo}`,
           text: message,
         });
-        return { sharedVia: "native_share", filename: safeFilename };
+        return { sharedVia: "native_share", filename: safeFilename, copiedMobile: phoneToCopy };
       }
     } catch (shareErr: any) {
       if (shareErr.name === "AbortError") {
         // User cancelled share picker
-        return { sharedVia: "native_share", filename: safeFilename };
+        return { sharedVia: "native_share", filename: safeFilename, copiedMobile: phoneToCopy };
       }
       console.warn("Native file share failed, falling back to download + WhatsApp Web:", shareErr);
     }
   }
 
-  // 4. Desktop / WhatsApp Web Fallback:
+  // 6. Desktop / WhatsApp Web Fallback:
   // Automatically trigger PDF download so the file is ready in user's downloads folder/bar
   pdf.save(safeFilename);
 
-  // Open WhatsApp Web with customer mobile & prefilled message
+  // Open WhatsApp Web with customer mobile & prefilled message (or standard WhatsApp Web if no mobile specified)
   const waUrl = formattedMobile
     ? `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    : `https://web.whatsapp.com`;
 
   window.open(waUrl, "_blank");
 
-  return { sharedVia: "download_and_whatsapp", filename: safeFilename };
+  return { sharedVia: "download_and_whatsapp", filename: safeFilename, copiedMobile: phoneToCopy };
 }
 
 export interface WhatsAppLedgerShareParams {
@@ -201,7 +225,7 @@ export interface WhatsAppLedgerShareParams {
 }
 
 /**
- * Generates Customer Monthly Ledger PDF and shares it to WhatsApp
+ * Generates Customer Monthly Ledger PDF, copies customer mobile number to clipboard, and shares to WhatsApp
  */
 export async function shareLedgerPDFOnWhatsApp({
   elementIdOrRef,
@@ -211,25 +235,51 @@ export async function shareLedgerPDFOnWhatsApp({
   closingBalance,
   companyName = "DHARMI THREAD & JARI",
   filename,
-}: WhatsAppLedgerShareParams): Promise<{ sharedVia: "native_share" | "download_and_whatsapp"; filename: string }> {
+}: WhatsAppLedgerShareParams): Promise<{
+  sharedVia: "native_share" | "download_and_whatsapp";
+  filename: string;
+  copiedMobile?: string;
+}> {
   const sanitizedName = customerName.replace(/[^a-zA-Z0-9]/g, "_");
   const targetFilename = filename || `Ledger_${sanitizedName}.pdf`;
 
-  // 1. Generate pristine high-resolution PDF File
+  // 1. Clean & prepare customer mobile number for copying & WhatsApp URL
+  const rawMobile = (customerMobile || "").trim();
+  const cleanMobileDigits = rawMobile.replace(/\D/g, "");
+  const tenDigitMobile =
+    cleanMobileDigits.length === 10
+      ? cleanMobileDigits
+      : cleanMobileDigits.startsWith("91") && cleanMobileDigits.length === 12
+      ? cleanMobileDigits.slice(2)
+      : cleanMobileDigits;
+  const formattedMobile = cleanMobileDigits.startsWith("91")
+    ? cleanMobileDigits
+    : cleanMobileDigits.length === 10
+    ? `91${cleanMobileDigits}`
+    : cleanMobileDigits;
+
+  const phoneToCopy = tenDigitMobile || rawMobile;
+
+  // 2. Automatically copy mobile number to clipboard
+  if (phoneToCopy && typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(phoneToCopy);
+    } catch (clipErr) {
+      console.warn("Failed to copy mobile number to clipboard:", clipErr);
+    }
+  }
+
+  // 3. Generate pristine high-resolution PDF File
   const { pdf, file, filename: safeFilename } = await generateInvoicePDF(
     elementIdOrRef,
     targetFilename
   );
 
-  // 2. Format WhatsApp message
-  const cleanMobile = (customerMobile || "").replace(/\D/g, "");
-  const formattedMobile = cleanMobile.startsWith("91")
-    ? cleanMobile
-    : cleanMobile.length === 10
-    ? `91${cleanMobile}`
-    : cleanMobile;
-
-  const balanceText = closingBalance >= 0 ? `₹${closingBalance.toLocaleString("en-IN")} (Debit/Receivable)` : `₹${Math.abs(closingBalance).toLocaleString("en-IN")} (Credit/Advance)`;
+  // 4. Format WhatsApp message
+  const balanceText =
+    closingBalance >= 0
+      ? `₹${closingBalance.toLocaleString("en-IN")} (Debit/Receivable)`
+      : `₹${Math.abs(closingBalance).toLocaleString("en-IN")} (Credit/Advance)`;
 
   const message =
     `*Account Statement / Ledger from ${companyName}*\n\n` +
@@ -240,7 +290,7 @@ export async function shareLedgerPDFOnWhatsApp({
     `Thank you for your business!\n` +
     `Mo: 99256 06480 | Surat, Gujarat`;
 
-  // 3. Try Native Web Share API with File
+  // 5. Try Native Web Share API with File
   if (
     typeof navigator !== "undefined" &&
     typeof navigator.share === "function" &&
@@ -253,24 +303,24 @@ export async function shareLedgerPDFOnWhatsApp({
           title: `Statement of Account - ${customerName}`,
           text: message,
         });
-        return { sharedVia: "native_share", filename: safeFilename };
+        return { sharedVia: "native_share", filename: safeFilename, copiedMobile: phoneToCopy };
       }
     } catch (shareErr: any) {
       if (shareErr.name === "AbortError") {
-        return { sharedVia: "native_share", filename: safeFilename };
+        return { sharedVia: "native_share", filename: safeFilename, copiedMobile: phoneToCopy };
       }
       console.warn("Native ledger file share failed, falling back to download + WhatsApp Web:", shareErr);
     }
   }
 
-  // 4. Desktop / WhatsApp Web Fallback
+  // 6. Desktop / WhatsApp Web Fallback
   pdf.save(safeFilename);
 
   const waUrl = formattedMobile
     ? `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    : `https://web.whatsapp.com`;
 
   window.open(waUrl, "_blank");
 
-  return { sharedVia: "download_and_whatsapp", filename: safeFilename };
+  return { sharedVia: "download_and_whatsapp", filename: safeFilename, copiedMobile: phoneToCopy };
 }

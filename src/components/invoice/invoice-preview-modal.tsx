@@ -93,7 +93,11 @@ export function InvoicePreviewModal({
       if (res.sharedVia === "native_share") {
         toast.success(`✓ Invoice PDF shared on WhatsApp!`);
       } else {
-        toast.success(`✓ ${res.filename} downloaded! Attach or drop the PDF in WhatsApp chat.`);
+        if (res.copiedMobile) {
+          toast.success(`📋 Mobile ${res.copiedMobile} copied! Paste (Ctrl+V) in WhatsApp search bar to open chat & attach ${res.filename}`);
+        } else {
+          toast.success(`✓ ${res.filename} downloaded! Attach the PDF into WhatsApp chat.`);
+        }
       }
     } catch (err: any) {
       console.error("WhatsApp share error:", err);
