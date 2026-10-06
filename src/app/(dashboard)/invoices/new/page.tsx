@@ -17,9 +17,8 @@ import {
   formatINR,
   formatNumber,
   numberToWordsIndian,
-  buildWhatsAppInvoiceShareUrl,
 } from "@/lib/billing-utils";
-import { downloadInvoicePDF } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp } from "@/lib/pdf-download";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -229,6 +228,7 @@ function NewInvoiceContent() {
 
   // PDF Export state
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [isSharingWhatsApp, setIsSharingWhatsApp] = useState<boolean>(false);
 
   // Modal Preview
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
@@ -984,19 +984,32 @@ function NewInvoiceContent() {
     }, 150);
   };
 
-  const handleWhatsAppLive = () => {
-    const url = buildWhatsAppInvoiceShareUrl(
-      liveInvoice.customerMobile,
-      {
-        invoiceNo: liveInvoice.invoiceNo,
-        customerName: liveInvoice.customerName,
-        date: liveInvoice.date,
-        grandTotal: liveInvoice.grandTotal,
-      },
-      settings.companyName
-    );
-    window.open(url, "_blank");
-    toast.success("WhatsApp sharing opened");
+  const handleWhatsAppLive = async () => {
+    try {
+      setIsSharingWhatsApp(true);
+      const target = document.getElementById("official-invoice-print-sheet");
+      if (!target) {
+        toast.error("Invoice element not ready");
+        return;
+      }
+
+      const res = await shareInvoicePDFOnWhatsApp({
+        elementIdOrRef: target,
+        invoice: liveInvoice,
+        companyName: settings.companyName,
+      });
+
+      if (res.sharedVia === "native_share") {
+        toast.success(`✓ Invoice PDF shared on WhatsApp!`);
+      } else {
+        toast.success(`✓ ${res.filename} downloaded! Attach or drop the PDF into WhatsApp.`);
+      }
+    } catch (err: any) {
+      console.error("WhatsApp share error:", err);
+      toast.error(err?.message || "Failed to generate Invoice PDF for WhatsApp");
+    } finally {
+      setIsSharingWhatsApp(false);
+    }
   };
 
   // Filtered customer search
@@ -1074,11 +1087,16 @@ function NewInvoiceContent() {
 
           <Button
             onClick={handleWhatsAppLive}
-            className="h-10 px-3.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-2xs"
-            title="Share on WhatsApp"
+            disabled={isSharingWhatsApp}
+            className="h-10 px-3.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Share Invoice PDF on WhatsApp"
           >
-            <Share2 className="h-4 w-4" />
-            <span>Share</span>
+            {isSharingWhatsApp ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Share2 className="h-4 w-4" />
+            )}
+            <span>Share PDF</span>
           </Button>
 
           <Button

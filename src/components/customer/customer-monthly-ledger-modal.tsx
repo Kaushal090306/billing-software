@@ -22,11 +22,12 @@ import {
   Phone,
   MapPin,
   CreditCard,
+  Share2,
   Filter,
   CheckCircle2,
   Loader2,
 } from "lucide-react";
-import { downloadInvoicePDF } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareLedgerPDFOnWhatsApp } from "@/lib/pdf-download";
 import { toast } from "sonner";
 
 interface CustomerMonthlyLedgerModalProps {
@@ -55,6 +56,7 @@ export function CustomerMonthlyLedgerModal({
 
   const [filterType, setFilterType] = useState<"all" | "gst" | "raw">("all");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharingWhatsApp, setIsSharingWhatsApp] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   // Invoices & Payments for this customer
@@ -235,6 +237,35 @@ export function CustomerMonthlyLedgerModal({
     }
   };
 
+  const handleWhatsAppShare = async () => {
+    if (!printRef.current || !customer) return;
+    setIsSharingWhatsApp(true);
+    try {
+      const sanitizedName = customer.businessName.replace(/[^a-zA-Z0-9]/g, "_");
+      const filename = `Ledger_${sanitizedName}_${selectedMonth}.pdf`;
+      const res = await shareLedgerPDFOnWhatsApp({
+        elementIdOrRef: printRef.current,
+        customerName: customer.businessName,
+        customerMobile: customer.mobile,
+        periodLabel: periodLabel,
+        closingBalance: closingBalance,
+        companyName: settings.companyName,
+        filename,
+      });
+
+      if (res.sharedVia === "native_share") {
+        toast.success(`✓ Monthly Ledger PDF shared on WhatsApp!`);
+      } else {
+        toast.success(`✓ ${res.filename} downloaded! Attach or drop the PDF in WhatsApp chat.`);
+      }
+    } catch (err: any) {
+      console.error("Ledger WhatsApp share error:", err);
+      toast.error(err?.message || "Failed to generate Ledger PDF for WhatsApp");
+    } finally {
+      setIsSharingWhatsApp(false);
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -324,6 +355,25 @@ export function CustomerMonthlyLedgerModal({
               >
                 <Printer className="h-3.5 w-3.5" />
                 <span>Print</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleWhatsAppShare}
+                disabled={isSharingWhatsApp}
+                className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5 shadow-xs cursor-pointer"
+                title="Share Monthly Ledger PDF on WhatsApp"
+              >
+                {isSharingWhatsApp ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Preparing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-3.5 w-3.5" />
+                    <span>WhatsApp</span>
+                  </>
+                )}
               </Button>
               <Button
                 size="sm"
