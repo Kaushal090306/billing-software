@@ -100,7 +100,7 @@ export function getFontFamilyCSS(font?: string): string | undefined {
     case "Cinzel":
       return "'Cinzel', serif";
     case "Plus Jakarta Sans":
-      return "'Plus Jakarta Sans', Arial, Helvetica, sans-serif";
+      return "'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Gujarati', 'Gujarati Sangam MN', Arial, sans-serif";
     default:
       return font;
   }

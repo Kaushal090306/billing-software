@@ -818,6 +818,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       );
       const totalSections = (template.sectionsOrder || []).length;
 
+      const isItemsTable = sectionId === "items_table";
+
       return (
         <div
           key={sectionId}
@@ -825,7 +827,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             sectionRefs.current[sectionId] = el;
           }}
           style={customHeight ? { minHeight: `${customHeight}px` } : undefined}
-          className={`relative flex flex-col justify-center transition-all group/sec ${interactive
+          className={`relative flex flex-col transition-all group/sec ${
+            isItemsTable ? "flex-1 flex-grow justify-start" : "justify-start"
+          } ${interactive
               ? "hover:ring-1 hover:ring-purple-400 hover:bg-purple-50/5"
               : ""
             } ${isHovered && interactive
@@ -833,8 +837,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               : ""
             }`}
         >
-          {/* Inner Section Content (Stretches full height and centers automatically) */}
-          <div className="w-full h-full flex flex-col justify-center flex-1">
+          {/* Inner Section Content */}
+          <div className={`w-full flex flex-col justify-start ${isItemsTable ? "flex-1 h-full" : "h-full"}`}>
             {content}
           </div>
 
@@ -1584,7 +1588,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 <div className="flex justify-between items-center text-[1.1em] font-bold">
                   <div>
                     GSTINO :{" "}
-                    <span className="font-mono font-black text-[1.15em]">
+                    <span className="font-black tabular-nums text-[1.15em] tracking-wide">
                       {renderET(
                         "receiver_gstin",
                         "Customer GSTIN",
@@ -1600,7 +1604,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </div>
                   <div>
                     State :{" "}
-                    <span className="font-mono font-bold">
+                    <span className="font-bold tabular-nums">
                       {renderET(
                         "receiver_gstin",
                         "State Code",
@@ -1639,7 +1643,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             >
               <span className="col-span-4 font-bold text-[1.05em]">Bill No :</span>
               <span
-                className="col-span-8 font-black text-[1.25em] font-mono text-right"
+                className="col-span-8 font-black text-[1.25em] tabular-nums text-right tracking-tight"
                 style={{
                   color:
                     template.themeColor !== "#000000"
@@ -1863,8 +1867,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       return renderSectionWrapper(
         "items_table",
         "Products Table",
-        <div className="w-full flex-1 flex flex-col justify-start relative">
-          <table className="w-full table-fixed border-collapse text-[1em] leading-tight">
+        <div className="w-full flex-1 h-full flex flex-col justify-between relative">
+          <table className="w-full h-full table-fixed border-collapse text-[1em] leading-tight" style={{ borderColor }}>
             <thead>
               <tr
                 className="border-b-2 font-black text-center text-[1em] h-7"
@@ -2104,6 +2108,16 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </tr>
               ))}
 
+              {/* Dynamic filler row that absorbs 100% of remaining table height so column borders extend continuously to the total bar */}
+              <tr style={{ height: "100%" }}>
+                <td className="border-r" style={{ borderColor }}></td>
+                <td className="border-r" style={{ borderColor }}></td>
+                <td className="border-r" style={{ borderColor }}></td>
+                <td className="border-r" style={{ borderColor }}></td>
+                <td className="border-r" style={{ borderColor }}></td>
+                <td></td>
+              </tr>
+
               {/* Total Summary Row */}
               <tr
                 className="border-t-2 border-b-2 font-black text-[1.05em] h-7"
@@ -2265,7 +2279,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     </div>
                     <div className="grid grid-cols-12 items-baseline">
                       <span className="col-span-4 font-bold text-[1.05em]">Bank A/c.No.</span>
-                      <span className="col-span-8 font-mono font-black text-[1.25em]">
+                      <span className="col-span-8 font-black tabular-nums text-[1.25em] tracking-wide">
                         :{" "}
                         {renderET(
                           "bank_details",
@@ -2281,7 +2295,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     </div>
                     <div className="grid grid-cols-12 items-baseline">
                       <span className="col-span-4 font-bold text-[1.05em]">RTGS/IFSC Code</span>
-                      <span className="col-span-8 font-mono font-black text-[1.2em]">
+                      <span className="col-span-8 font-black tabular-nums text-[1.2em] tracking-wide">
                         :{" "}
                         {renderET(
                           "bank_details",
@@ -2299,7 +2313,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     {settings.upiId && settings.upiId.trim().length > 0 && (
                       <div className="grid grid-cols-12 items-baseline pt-0.5">
                         <span className="col-span-4 font-bold text-[1.05em]">UPI ID</span>
-                        <span className="col-span-8 font-mono font-black text-[1.15em] text-purple-900 dark:text-purple-300">
+                        <span className="col-span-8 font-black tabular-nums text-[1.15em] text-purple-900 dark:text-purple-300">
                           : {settings.upiId}
                         </span>
                       </div>
@@ -2336,7 +2350,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   invoice.discount > 0 ? (
                   <div className="flex justify-between font-bold text-red-700 print:text-black">
                     <span>Less: Discount</span>
-                    <span className="font-mono font-bold text-[1.1em]">
+                    <span className="font-bold tabular-nums text-[1.1em]">
                       - {formatNumber(invoice.discount, 2)}
                     </span>
                   </div>
@@ -2344,7 +2358,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 {invoice.roundOff !== 0 && (
                   <div className="flex justify-between font-bold">
                     <span>Round off</span>
-                    <span className="font-mono">
+                    <span className="font-bold tabular-nums">
                       {formatNumber(invoice.roundOff, 2)}
                     </span>
                   </div>
@@ -2357,7 +2371,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   invoice.discount > 0 ? (
                   <div className="flex justify-between font-bold text-red-700 print:text-black">
                     <span>Less: Discount</span>
-                    <span className="font-mono font-bold text-[1.1em]">
+                    <span className="font-bold tabular-nums text-[1.1em]">
                       - {formatNumber(invoice.discount, 2)}
                     </span>
                   </div>
@@ -2366,13 +2380,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   <>
                     <div className="flex justify-between font-bold">
                       <span>CGST ({cgstPct}%)</span>
-                      <span className="font-mono font-bold text-[1.1em]">
+                      <span className="font-bold tabular-nums text-[1.1em]">
                         {formatNumber(invoice.totalCgst, 2)}
                       </span>
                     </div>
                     <div className="flex justify-between font-bold">
                       <span>SGST ({sgstPct}%)</span>
-                      <span className="font-mono font-bold text-[1.1em]">
+                      <span className="font-bold tabular-nums text-[1.1em]">
                         {formatNumber(invoice.totalSgst, 2)}
                       </span>
                     </div>
@@ -2380,14 +2394,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 ) : (
                   <div className="flex justify-between font-bold">
                     <span>IGST ({igstPct}%)</span>
-                    <span className="font-mono font-bold text-[1.1em]">
+                    <span className="font-bold tabular-nums text-[1.1em]">
                       {formatNumber(invoice.totalIgst, 2)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold">
                   <span>Round off</span>
-                  <span className="font-mono">
+                  <span className="font-bold tabular-nums">
                     {formatNumber(invoice.roundOff, 2)}
                   </span>
                 </div>
@@ -2412,7 +2426,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 )}
               </span>
               <span
-                className="font-mono font-black text-[1.55em] text-right"
+                className="font-black tabular-nums text-[1.55em] text-right tracking-tight"
                 style={{
                   color:
                     template.themeColor !== "#000000"
@@ -2809,7 +2823,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       <div
         ref={ref}
         id="official-invoice-print-sheet"
-        className={`invoice-print-container relative bg-white text-black ${containerBorderClass} shadow-md flex flex-col justify-between w-full max-w-[720px] min-h-[960px] mx-auto p-0 print:border-2 print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-full print:min-h-[285mm] select-text`}
+        className={`invoice-print-container relative bg-white text-black ${containerBorderClass} shadow-md flex flex-col justify-start w-full max-w-[720px] min-h-[960px] mx-auto p-0 print:border-2 print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-full print:min-h-[285mm] select-text`}
         style={{
           fontFamily: fontFamilyStyle,
           fontSize: `${baseFontSizePx}px`,
@@ -2839,7 +2853,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           </div>
         )}
 
-        <div className="relative z-1 w-full flex flex-col flex-1 justify-between">
+        <div className="relative z-1 w-full flex flex-col flex-1 justify-start">
           {orderedSections}
         </div>
       </div>

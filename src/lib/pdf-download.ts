@@ -52,6 +52,9 @@ export async function generateInvoicePDF(
   clone.style.minWidth = "794px";
   clone.style.maxWidth = "794px";
   clone.style.minHeight = "1120px";
+  clone.style.display = "flex";
+  clone.style.flexDirection = "column";
+  clone.style.justifyContent = "flex-start";
   clone.style.margin = "0 auto";
   clone.style.boxShadow = "none";
   clone.style.transform = "none";
@@ -65,15 +68,41 @@ export async function generateInvoicePDF(
     el.remove();
   });
 
+  // Inject font and layout styles directly inside the sandbox
+  // This guarantees mobile devices don't substitute monospace/Courier fonts for numbers and totals
+  const styleEl = document.createElement("style");
+  styleEl.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    #sandbox-cloned-invoice,
+    #sandbox-cloned-invoice * {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Gujarati', 'Gujarati Sangam MN', Arial, sans-serif !important;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    #sandbox-cloned-invoice .tabular-nums,
+    #sandbox-cloned-invoice .font-mono {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Gujarati', 'Gujarati Sangam MN', Arial, sans-serif !important;
+      font-variant-numeric: tabular-nums !important;
+    }
+  `;
+  sandbox.appendChild(styleEl);
   sandbox.appendChild(clone);
   document.body.appendChild(sandbox);
 
   try {
-    // Wait for fonts & rendering engine to settle
-    if (typeof document !== "undefined" && (document as any).fonts?.ready) {
-      await (document as any).fonts.ready;
+    // Wait for fonts & rendering engine to settle completely on mobile and desktop
+    if (typeof document !== "undefined" && (document as any).fonts) {
+      try {
+        await (document as any).fonts.load("400 14px 'Plus Jakarta Sans'");
+        await (document as any).fonts.load("600 14px 'Plus Jakarta Sans'");
+        await (document as any).fonts.load("700 14px 'Plus Jakarta Sans'");
+        await (document as any).fonts.load("800 14px 'Plus Jakarta Sans'");
+        await (document as any).fonts.ready;
+      } catch (fontErr) {
+        // Fallback font load ready
+      }
     }
-    await new Promise((r) => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 100));
 
     // Capture pristine 300dpi image from sandbox
     const measuredHeight = Math.max(clone.scrollHeight, clone.offsetHeight, 1123);
