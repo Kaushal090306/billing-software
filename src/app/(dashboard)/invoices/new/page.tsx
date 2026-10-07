@@ -18,7 +18,7 @@ import {
   formatNumber,
   numberToWordsIndian,
 } from "@/lib/billing-utils";
-import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement } from "@/lib/pdf-download";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -980,8 +980,13 @@ function NewInvoiceContent() {
   const handlePrintLive = (copy: "Original" | "Duplicate" | "Triplicate") => {
     setPreviewCopyType(copy);
     setTimeout(() => {
-      window.print();
-    }, 150);
+      const target = document.getElementById("official-invoice-print-sheet");
+      if (target) {
+        printInvoiceElement(target);
+      } else {
+        window.print();
+      }
+    }, 80);
   };
 
   const handleWhatsAppLive = async () => {

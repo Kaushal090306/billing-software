@@ -8,7 +8,7 @@ import { InvoiceTemplate } from "@/components/invoice/invoice-template";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Printer, Share2, Download, Copy, Plus, Loader2, LayoutTemplate, FileCheck2 } from "lucide-react";
-import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement } from "@/lib/pdf-download";
 import { toast } from "sonner";
 
 export default function InvoiceDetailPage() {
@@ -64,8 +64,13 @@ export default function InvoiceDetailPage() {
   const handlePrint = (type: "Original" | "Duplicate" | "Triplicate") => {
     setCopyType(type);
     setTimeout(() => {
-      window.print();
-    }, 150);
+      const target = document.getElementById("official-invoice-print-sheet");
+      if (target) {
+        printInvoiceElement(target);
+      } else {
+        window.print();
+      }
+    }, 80);
   };
 
   const handleDownloadPDF = async () => {

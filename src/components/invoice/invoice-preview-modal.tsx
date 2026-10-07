@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { InvoiceTemplate } from "./invoice-template";
 import { Invoice, BusinessSettings, InvoiceTemplateConfig, BillingStore } from "@/lib/store";
 import { Printer, Share2, Download, Copy, Check, Loader2, LayoutTemplate } from "lucide-react";
-import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement } from "@/lib/pdf-download";
 import { toast } from "sonner";
 
 interface InvoicePreviewModalProps {
@@ -52,8 +52,13 @@ export function InvoicePreviewModal({
   const handlePrint = (type: "Original" | "Duplicate" | "Triplicate") => {
     setCopyType(type);
     setTimeout(() => {
-      window.print();
-    }, 150);
+      const target = printRef.current || document.getElementById("official-invoice-print-sheet");
+      if (target) {
+        printInvoiceElement(target);
+      } else {
+        window.print();
+      }
+    }, 80);
   };
 
   const handleDownloadPDF = async () => {

@@ -27,7 +27,7 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react";
-import { downloadInvoicePDF, shareLedgerPDFOnWhatsApp } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareLedgerPDFOnWhatsApp, printInvoiceElement } from "@/lib/pdf-download";
 import { toast } from "sonner";
 
 interface CustomerMonthlyLedgerModalProps {
@@ -271,7 +271,11 @@ export function CustomerMonthlyLedgerModal({
   };
 
   const handlePrint = () => {
-    window.print();
+    if (printRef.current) {
+      printInvoiceElement(printRef.current);
+    } else {
+      window.print();
+    }
   };
 
   const handleExportCSV = () => {

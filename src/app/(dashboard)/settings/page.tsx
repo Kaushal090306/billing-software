@@ -59,7 +59,7 @@ import {
   Edit2,
   HelpCircle,
 } from "lucide-react";
-import { downloadInvoicePDF } from "@/lib/pdf-download";
+import { downloadInvoicePDF, printInvoiceElement } from "@/lib/pdf-download";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
@@ -446,7 +446,12 @@ export default function SettingsPage() {
 
   // Print Test Bill
   const handlePrintTest = () => {
-    window.print();
+    const target = previewPrintRef.current || document.getElementById("official-invoice-print-sheet");
+    if (target) {
+      printInvoiceElement(target);
+    } else {
+      window.print();
+    }
   };
 
   // Image Upload Handlers

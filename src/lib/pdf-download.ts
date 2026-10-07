@@ -9,7 +9,8 @@ export interface GeneratePDFResult {
 }
 
 /**
- * Generates a pristine high-resolution (300dpi) PDF instance, blob, and File object from an HTML element
+ * Generates a pristine high-resolution (300dpi) PDF instance, blob, and File object from an HTML element.
+ * Guarantees 100% single-page A4 fit with full layout on mobile devices and desktop alike.
  */
 export async function generateInvoicePDF(
   elementIdOrRef: HTMLElement | string,
@@ -25,17 +26,61 @@ export async function generateInvoicePDF(
     throw new Error("Invoice template element not found");
   }
 
+  // 1. Create an off-screen fixed-width desktop A4 sandbox (794px = standard A4 width at 96 DPI)
+  // This guarantees that on mobile phones (360px - 412px screen width), the rendered layout is
+  // 100% identical to desktop A4 with NO wrapping, NO squishing, and NO missing columns!
+  const sandbox = document.createElement("div");
+  sandbox.id = "pdf-render-sandbox";
+  sandbox.style.position = "fixed";
+  sandbox.style.left = "-9999px";
+  sandbox.style.top = "0";
+  sandbox.style.width = "794px";
+  sandbox.style.minWidth = "794px";
+  sandbox.style.maxWidth = "794px";
+  sandbox.style.background = "#ffffff";
+  sandbox.style.color = "#000000";
+  sandbox.style.zIndex = "-99999";
+  sandbox.style.overflow = "visible";
+  sandbox.style.boxSizing = "border-box";
+  sandbox.style.margin = "0";
+  sandbox.style.padding = "0";
+
+  // Deep clone the invoice element with all inner HTML and styles
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.id = "sandbox-cloned-invoice";
+  clone.style.width = "794px";
+  clone.style.minWidth = "794px";
+  clone.style.maxWidth = "794px";
+  clone.style.margin = "0 auto";
+  clone.style.boxShadow = "none";
+  clone.style.border = "1.5px solid #000000";
+  clone.style.transform = "none";
+  clone.style.overflow = "visible";
+  clone.style.background = "#ffffff";
+  clone.style.color = "#000000";
+
+  sandbox.appendChild(clone);
+  document.body.appendChild(sandbox);
+
   try {
-    // Generate high resolution PNG (pixelRatio: 2 for 300dpi sharpness)
-    // Override any parent transform scale to capture full pristine resolution
-    const dataUrl = await toPng(element, {
+    // Wait for fonts & rendering engine to settle
+    if (typeof document !== "undefined" && (document as any).fonts?.ready) {
+      await (document as any).fonts.ready;
+    }
+    await new Promise((r) => setTimeout(r, 60));
+
+    // Capture pristine 300dpi image from sandbox
+    const measuredHeight = Math.max(clone.scrollHeight, clone.offsetHeight, 1123);
+
+    const dataUrl = await toPng(clone, {
       quality: 1.0,
-      pixelRatio: 2,
+      pixelRatio: 2, // 300dpi sharpness
       backgroundColor: "#ffffff",
       cacheBust: true,
+      width: 794,
+      height: measuredHeight,
       style: {
         transform: "none",
-        transformOrigin: "top center",
         margin: "0 auto",
       },
     });
@@ -47,14 +92,13 @@ export async function generateInvoicePDF(
       compress: true,
     });
 
-    const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
-    const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+    const pdfWidth = 210; // mm
+    const pdfHeight = 297; // mm
+    const margin = 3.5; // mm (leaves 203mm printable width & 290mm printable height)
+    const availableWidth = pdfWidth - margin * 2; // 203mm
+    const availableHeight = pdfHeight - margin * 2; // 290mm
 
-    // Fill page margins with 4mm padding on all sides for standard A4
-    const margin = 4;
-    const printWidth = pdfWidth - margin * 2; // 202mm
-
-    // Measure image dimensions
+    // Measure rendered image natural dimensions
     const img = new Image();
     img.src = dataUrl;
     await new Promise((resolve, reject) => {
@@ -62,16 +106,31 @@ export async function generateInvoicePDF(
       img.onerror = (e) => reject(e);
     });
 
-    const printHeight = (img.naturalHeight * printWidth) / img.naturalWidth;
-    const finalHeight = Math.min(printHeight, pdfHeight - margin * 2);
+    const naturalW = img.naturalWidth || 1588;
+    const naturalH = img.naturalHeight || 2246;
+
+    // Calculate proportional dimensions so 100% of the invoice fits on a single A4 page
+    let printWidth = availableWidth;
+    let printHeight = (naturalH * availableWidth) / naturalW;
+
+    // If printHeight exceeds available page height, scale down proportionally to fit 1 page perfectly
+    if (printHeight > availableHeight) {
+      const scale = availableHeight / printHeight;
+      printHeight = availableHeight;
+      printWidth = printWidth * scale;
+    }
+
+    // Center horizontally and vertically on A4 page
+    const posX = margin + (availableWidth - printWidth) / 2;
+    const posY = margin + (availableHeight - printHeight) / 2;
 
     pdf.addImage(
       dataUrl,
       "PNG",
-      margin,
-      margin,
+      posX,
+      posY,
       printWidth,
-      finalHeight,
+      printHeight,
       undefined,
       "FAST"
     );
@@ -84,6 +143,11 @@ export async function generateInvoicePDF(
   } catch (err) {
     console.error("PDF generation failed:", err);
     throw err;
+  } finally {
+    // Always clean up sandbox element
+    if (document.body.contains(sandbox)) {
+      document.body.removeChild(sandbox);
+    }
   }
 }
 
@@ -96,6 +160,54 @@ export async function downloadInvoicePDF(
 ): Promise<void> {
   const { pdf, filename: safeFilename } = await generateInvoicePDF(elementIdOrRef, filename);
   pdf.save(safeFilename);
+}
+
+/**
+ * Triggers clean, pixel-perfect single-page A4 printing without modal dialog clipping or vertical offsets.
+ * Creates an isolated print container directly on document.body so modal transforms cannot displace it.
+ */
+export function printInvoiceElement(elementIdOrRef: HTMLElement | string) {
+  const element =
+    typeof elementIdOrRef === "string"
+      ? document.getElementById(elementIdOrRef)
+      : elementIdOrRef;
+
+  if (!element) {
+    window.print();
+    return;
+  }
+
+  // Remove any previous print sandbox
+  const existing = document.getElementById("global-print-sandbox");
+  if (existing && document.body.contains(existing)) {
+    document.body.removeChild(existing);
+  }
+
+  // Create isolated print sandbox directly on document.body
+  const printSandbox = document.createElement("div");
+  printSandbox.id = "global-print-sandbox";
+
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.id = "cloned-invoice-print-sheet";
+  clone.classList.add("invoice-print-container");
+  printSandbox.appendChild(clone);
+  document.body.appendChild(printSandbox);
+
+  const cleanup = () => {
+    if (document.body.contains(printSandbox)) {
+      document.body.removeChild(printSandbox);
+    }
+    window.removeEventListener("afterprint", cleanup);
+  };
+
+  window.addEventListener("afterprint", cleanup);
+
+  // Trigger print after brief delay to allow styles to settle
+  setTimeout(() => {
+    window.print();
+    // Fallback cleanup in case afterprint does not fire in some browsers
+    setTimeout(cleanup, 4000);
+  }, 120);
 }
 
 export interface WhatsAppInvoiceShareParams {
@@ -156,7 +268,7 @@ export async function shareInvoicePDFOnWhatsApp({
     }
   }
 
-  // 3. Generate pristine high-resolution PDF File
+  // 3. Generate pristine high-resolution PDF File using A4 sandbox
   const { pdf, file, filename: safeFilename } = await generateInvoicePDF(
     elementIdOrRef,
     targetFilename

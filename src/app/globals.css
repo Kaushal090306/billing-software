@@ -247,47 +247,138 @@
 }
 
 /* Print Styles for Pixel Perfect Single-Page Invoice */
+@media screen {
+  #global-print-sandbox {
+    display: none !important;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;
-    margin: 4mm;
+    margin: 0;
   }
+
   html, body {
+    width: 210mm !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #ffffff !important;
     color: #000000 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    height: auto !important;
     overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  body * {
+
+  /* When global-print-sandbox is active, hide everything else on the page */
+  body:has(#global-print-sandbox) > *:not(#global-print-sandbox) {
+    display: none !important;
     visibility: hidden !important;
   }
-  .invoice-print-container,
-  .invoice-print-container * {
+
+  #global-print-sandbox {
+    display: block !important;
+    visibility: visible !important;
+    position: absolute !important;
+    left: 3mm !important;
+    top: 3mm !important;
+    width: 204mm !important;
+    max-width: 204mm !important;
+    min-height: 288mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  #global-print-sandbox * {
     visibility: visible !important;
   }
-  .invoice-print-container {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+
+  #global-print-sandbox .invoice-print-container {
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 auto !important;
+    min-height: 288mm !important;
+    margin: 0 !important;
     padding: 0 !important;
     border: 1.5px solid #000000 !important;
     box-shadow: none !important;
-    transform: none !important;
-    overflow: visible !important;
+    box-sizing: border-box !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     page-break-after: avoid !important;
     break-after: avoid !important;
   }
-  .no-print, header, aside, nav, button, [data-sidebar="sidebar"], [data-sidebar="inset"] > header {
+
+  /* Universal fallback when printing directly without sandbox (e.g. browser Ctrl+P) */
+  [data-radix-portal],
+  [role="dialog"],
+  [data-state],
+  .fixed,
+  .sticky {
+    position: static !important;
+    transform: none !important;
+    inset: auto !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body:not(:has(#global-print-sandbox)) * {
+    visibility: hidden !important;
+  }
+
+  body:not(:has(#global-print-sandbox)) #official-invoice-print-sheet,
+  body:not(:has(#global-print-sandbox)) #official-invoice-print-sheet *,
+  body:not(:has(#global-print-sandbox)) .invoice-print-container,
+  body:not(:has(#global-print-sandbox)) .invoice-print-container *,
+  body:not(:has(#global-print-sandbox)) #customer-monthly-ledger-print,
+  body:not(:has(#global-print-sandbox)) #customer-monthly-ledger-print * {
+    visibility: visible !important;
+  }
+
+  body:not(:has(#global-print-sandbox)) #official-invoice-print-sheet,
+  body:not(:has(#global-print-sandbox)) .invoice-print-container,
+  body:not(:has(#global-print-sandbox)) #customer-monthly-ledger-print {
+    position: absolute !important;
+    left: 3mm !important;
+    top: 3mm !important;
+    width: 204mm !important;
+    max-width: 204mm !important;
+    min-height: 288mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1.5px solid #000000 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box !important;
+  }
+
+  .no-print,
+  header,
+  aside,
+  nav,
+  button,
+  [data-sidebar="sidebar"],
+  [data-sidebar="inset"] > header {
     display: none !important;
+    visibility: hidden !important;
   }
 }
 
