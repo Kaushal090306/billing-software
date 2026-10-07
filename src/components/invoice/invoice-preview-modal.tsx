@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { InvoiceTemplate } from "./invoice-template";
 import { Invoice, BusinessSettings, InvoiceTemplateConfig, BillingStore } from "@/lib/store";
 import { Printer, Share2, Download, Copy, Check, Loader2, LayoutTemplate } from "lucide-react";
-import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement, getProperInvoicePdfFilename } from "@/lib/pdf-download";
 import { toast } from "sonner";
 
 interface InvoicePreviewModalProps {
@@ -69,9 +69,9 @@ export function InvoicePreviewModal({
         toast.error("Invoice element not ready");
         return;
       }
-      const safeInvoiceName = (invoice.invoiceNo || "Invoice").replace(/[\/\\]/g, "_");
-      await downloadInvoicePDF(target, `SaleBill_${safeInvoiceName}.pdf`);
-      toast.success(`Downloaded SaleBill_${safeInvoiceName}.pdf!`);
+      const filename = getProperInvoicePdfFilename(invoice);
+      await downloadInvoicePDF(target, filename);
+      toast.success(`Downloaded ${filename}!`);
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate PDF");

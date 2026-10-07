@@ -51,13 +51,19 @@ export async function generateInvoicePDF(
   clone.style.width = "794px";
   clone.style.minWidth = "794px";
   clone.style.maxWidth = "794px";
+  clone.style.minHeight = "1120px";
   clone.style.margin = "0 auto";
   clone.style.boxShadow = "none";
-  clone.style.border = "1.5px solid #000000";
   clone.style.transform = "none";
   clone.style.overflow = "visible";
   clone.style.background = "#ffffff";
   clone.style.color = "#000000";
+
+  // Strip any buttons, file inputs, dropdowns or no-print UI elements from the clone
+  // to ensure 100% pure standard invoice output with no extraneous controls
+  clone.querySelectorAll(".no-print, button, input, select").forEach((el) => {
+    el.remove();
+  });
 
   sandbox.appendChild(clone);
   document.body.appendChild(sandbox);
@@ -239,8 +245,7 @@ export async function shareInvoicePDFOnWhatsApp({
   filename: string;
   copiedMobile?: string;
 }> {
-  const safeInvoiceName = (invoice.invoiceNo || "Invoice").replace(/[\/\\]/g, "_");
-  const targetFilename = filename || `SaleBill_${safeInvoiceName}.pdf`;
+  const targetFilename = filename || getProperInvoicePdfFilename(invoice);
 
   // 1. Clean & prepare customer mobile number for copying & WhatsApp URL
   const rawMobile = (invoice.customerMobile || "").trim();
@@ -436,3 +441,88 @@ export async function shareLedgerPDFOnWhatsApp({
 
   return { sharedVia: "download_and_whatsapp", filename: safeFilename, copiedMobile: phoneToCopy };
 }
+
+/**
+ * Generates an official, clean, sanitized PDF filename for any invoice.
+ * Example for GST Invoice: TaxInvoice_DTJ-101_MODI_FASHION_2026-10-06.pdf
+ * Example for Raw Bill: RawBill_RAW-024_KIRAN_TEXTILES_2026-10-06.pdf
+ */
+export function getProperInvoicePdfFilename(invoice: {
+  invoiceNo?: string;
+  billType?: string;
+  customerName?: string;
+  date?: string;
+}): string {
+  const isRaw = invoice.billType === "raw";
+  const prefix = isRaw ? "RawBill" : "TaxInvoice";
+  const rawNo = invoice.invoiceNo || "Bill";
+  // Replace slashes or special characters with dash
+  const safeInvNo = rawNo.replace(/[\/\\?%*:|"<>]/g, "-").trim();
+  const rawCustomer = invoice.customerName || "Customer";
+  const safeCustName = rawCustomer
+    .trim()
+    .replace(/[\/\\?%*:|"<>]/g, "_")
+    .replace(/\s+/g, "_")
+    .toUpperCase();
+  const rawDate = (invoice.date || "").trim();
+  const safeDate = rawDate.replace(/[\/\\?%*:|"<>]/g, "-");
+
+  if (safeDate) {
+    return `${prefix}_${safeInvNo}_${safeCustName}_${safeDate}.pdf`;
+  }
+  return `${prefix}_${safeInvNo}_${safeCustName}.pdf`;
+}
+
+/**
+ * Generates an official, clean, sanitized ZIP archive filename for batch invoice export.
+ * Example for Month: Invoices_Dharmi_October_2026.zip
+ * Example for Date Range: TaxInvoices_Dharmi_2026-10-01_to_2026-10-07.zip
+ * Example for Single Customer: Invoices_MODI_FASHION_October_2026.zip
+ */
+export function getProperZipArchiveFilename(options: {
+  periodLabel?: string;
+  startDate?: string;
+  endDate?: string;
+  billType?: "all" | "gst" | "raw";
+  customerName?: string;
+  companyName?: string;
+}): string {
+  const parts: string[] = [];
+
+  // 1. Bill Type prefix
+  if (options.billType === "gst") {
+    parts.push("TaxInvoices");
+  } else if (options.billType === "raw") {
+    parts.push("RawBills");
+  } else {
+    parts.push("Invoices");
+  }
+
+  // 2. Company / Brand or Customer Name
+  if (options.customerName && options.customerName !== "all" && options.customerName.trim().length > 0) {
+    parts.push(options.customerName.trim().replace(/[\/\\?%*:|"<>]/g, "_").replace(/\s+/g, "_").toUpperCase());
+  } else {
+    const rawCompany = (options.companyName || "Dharmi").trim();
+    const safeCompany = rawCompany
+      .split(" ")[0] // Take primary brand name, e.g. "Dharmi"
+      .replace(/[\/\\?%*:|"<>]/g, "_");
+    parts.push(safeCompany);
+  }
+
+  // 3. Duration / Date Range
+  if (options.periodLabel) {
+    parts.push(options.periodLabel.replace(/[\/\\?%*:|"<>]/g, "_").replace(/\s+/g, "_"));
+  } else if (options.startDate && options.endDate) {
+    if (options.startDate === options.endDate) {
+      parts.push(options.startDate);
+    } else {
+      parts.push(`${options.startDate}_to_${options.endDate}`);
+    }
+  } else {
+    const today = new Date().toISOString().split("T")[0];
+    parts.push(today);
+  }
+
+  return `${parts.join("_")}.zip`;
+}
+

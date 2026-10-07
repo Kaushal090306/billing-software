@@ -23,7 +23,10 @@ import {
   FileText,
   Users,
   CreditCard,
+  Archive,
 } from "lucide-react";
+import { BatchInvoiceZipModal } from "@/components/invoice/batch-invoice-zip-modal";
+import { BusinessSettings } from "@/lib/store";
 import { toast } from "sonner";
 
 export default function ReportsPage() {
@@ -31,6 +34,8 @@ export default function ReportsPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [settings, setSettings] = useState<BusinessSettings>(BillingStore.getSettings());
+  const [isBatchZipOpen, setIsBatchZipOpen] = useState(false);
 
   useEffect(() => {
     const loadData = () => {
@@ -38,6 +43,7 @@ export default function ReportsPage() {
       setCustomers(BillingStore.getCustomers());
       setProducts(BillingStore.getProducts());
       setPayments(BillingStore.getPayments());
+      setSettings(BillingStore.getSettings());
     };
     loadData();
     const unsubscribe = BillingStore.subscribe(loadData);
@@ -177,6 +183,16 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsBatchZipOpen(true)}
+            variant="outline"
+            className="h-10 px-3.5 rounded-md border-purple-300 dark:border-purple-700/60 bg-purple-50/70 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-950/70 text-purple-700 dark:text-purple-300 font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Download invoices for any custom period in a single-click ZIP archive"
+          >
+            <Archive className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            <span>Download Invoices ZIP</span>
+          </Button>
+
           <Button
             onClick={handleExportCSV}
             variant="outline"
@@ -449,6 +465,15 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Batch Invoice ZIP Download Modal */}
+      <BatchInvoiceZipModal
+        isOpen={isBatchZipOpen}
+        onClose={() => setIsBatchZipOpen(false)}
+        invoices={invoices}
+        settings={settings}
+        defaultPeriod="this_month"
+      />
     </div>
   );
 }

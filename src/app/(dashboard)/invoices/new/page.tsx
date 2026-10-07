@@ -18,7 +18,7 @@ import {
   formatNumber,
   numberToWordsIndian,
 } from "@/lib/billing-utils";
-import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement, getProperInvoicePdfFilename } from "@/lib/pdf-download";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -611,9 +611,9 @@ function NewInvoiceContent() {
         toast.error("Invoice element not ready");
         return;
       }
-      const safeInvoiceName = (liveInvoice.invoiceNo || "Invoice").replace(/[\/\\]/g, "_");
-      await downloadInvoicePDF(target, `SaleBill_${safeInvoiceName}.pdf`);
-      toast.success(`Downloaded SaleBill_${safeInvoiceName}.pdf successfully!`);
+      const filename = getProperInvoicePdfFilename(liveInvoice);
+      await downloadInvoicePDF(target, filename);
+      toast.success(`Downloaded ${filename} successfully!`);
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate PDF download");

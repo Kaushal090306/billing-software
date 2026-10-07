@@ -36,8 +36,10 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Archive,
 } from "lucide-react";
 import { InvoicePreviewModal } from "@/components/invoice/invoice-preview-modal";
+import { BatchInvoiceZipModal } from "@/components/invoice/batch-invoice-zip-modal";
 import { toast } from "sonner";
 
 export default function InvoicesPage() {
@@ -53,6 +55,9 @@ export default function InvoicesPage() {
   // Selected Invoice for Preview Modal
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Batch ZIP Modal State
+  const [isBatchZipOpen, setIsBatchZipOpen] = useState(false);
 
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -199,6 +204,17 @@ export default function InvoicesPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => setIsBatchZipOpen(true)}
+            variant="outline"
+            className="h-10 px-3.5 rounded-md border-purple-300 dark:border-purple-700/60 bg-purple-50/70 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-950/70 text-purple-700 dark:text-purple-300 font-semibold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Download invoices for any custom period in a single-click ZIP archive"
+          >
+            <Archive className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            <span>Download ZIP</span>
+          </Button>
+
           <Button
             asChild
             variant="outline"
@@ -527,6 +543,15 @@ export default function InvoicesPage() {
         settings={settings}
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
+      />
+
+      {/* Batch Invoice ZIP Download Modal */}
+      <BatchInvoiceZipModal
+        isOpen={isBatchZipOpen}
+        onClose={() => setIsBatchZipOpen(false)}
+        invoices={invoices}
+        settings={settings}
+        defaultPeriod="this_month"
       />
 
       {/* Record Payment Dialog */}

@@ -8,7 +8,7 @@ import { InvoiceTemplate } from "@/components/invoice/invoice-template";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Printer, Share2, Download, Copy, Plus, Loader2, LayoutTemplate, FileCheck2 } from "lucide-react";
-import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement } from "@/lib/pdf-download";
+import { downloadInvoicePDF, shareInvoicePDFOnWhatsApp, printInvoiceElement, getProperInvoicePdfFilename } from "@/lib/pdf-download";
 import { toast } from "sonner";
 
 export default function InvoiceDetailPage() {
@@ -81,9 +81,9 @@ export default function InvoiceDetailPage() {
         toast.error("Invoice element not ready");
         return;
       }
-      const safeInvoiceName = (invoice.invoiceNo || "Invoice").replace(/[\/\\]/g, "_");
-      await downloadInvoicePDF(target, `SaleBill_${safeInvoiceName}.pdf`);
-      toast.success(`Downloaded SaleBill_${safeInvoiceName}.pdf!`);
+      const filename = getProperInvoicePdfFilename(invoice);
+      await downloadInvoicePDF(target, filename);
+      toast.success(`Downloaded ${filename}!`);
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate PDF");
