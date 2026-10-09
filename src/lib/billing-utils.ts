@@ -352,4 +352,111 @@ export function buildWhatsAppInvoiceShareUrl(
   return `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
 }
 
+/**
+ * Formats a Date object to YYYY-MM-DD in local time (avoiding UTC timezone shifts)
+ */
+export function formatDateToYMD(d: Date): string {
+  if (isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Normalizes any date representation (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYY-MM-DD, ISO string, Date object)
+ * into a standard YYYY-MM-DD string for safe sorting and range comparison.
+ */
+export function normalizeDateToYMD(rawDate?: string | Date | number | null): string {
+  if (!rawDate && rawDate !== 0) return "";
+
+  if (rawDate instanceof Date) {
+    return formatDateToYMD(rawDate);
+  }
+
+  if (typeof rawDate === "number" && !isNaN(rawDate) && rawDate > 0) {
+    const d = new Date(rawDate);
+    return formatDateToYMD(d);
+  }
+
+  let str = String(rawDate).trim();
+  if (!str) return "";
+
+  // 1. Strict YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+
+  // 2. Starts with YYYY-MM-DD (e.g. ISO string like 2026-09-27T10:00:00.000Z)
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    try {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return formatDateToYMD(d);
+      }
+    } catch {
+      // fallback
+    }
+    return str.substring(0, 10);
+  }
+
+  // Replace dots with slashes: 27.09.2026 -> 27/09/2026
+  if (str.includes(".")) {
+    str = str.replace(/\./g, "/");
+  }
+
+  // 3. Slash separated: DD/MM/YYYY or YYYY/MM/DD
+  if (str.includes("/")) {
+    const parts = str.split("/").map((p) => p.trim());
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY/MM/DD
+        const y = parts[0];
+        const m = parts[1].padStart(2, "0");
+        const d = parts[2].padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      } else {
+        // DD/MM/YYYY
+        const d = parts[0].padStart(2, "0");
+        const m = parts[1].padStart(2, "0");
+        const y = parts[2].length === 2 ? `20${parts[2]}` : parts[2].padStart(4, "20");
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
+
+  // 4. Dash separated: DD-MM-YYYY or YYYY-MM-DD
+  if (str.includes("-")) {
+    const parts = str.split("-").map((p) => p.trim());
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        const y = parts[0];
+        const m = parts[1].padStart(2, "0");
+        const d = parts[2].padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      } else {
+        // DD-MM-YYYY
+        const d = parts[0].padStart(2, "0");
+        const m = parts[1].padStart(2, "0");
+        const y = parts[2].length === 2 ? `20${parts[2]}` : parts[2].padStart(4, "20");
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
+
+  // 5. Fallback Date parsing (e.g. "27 Sep 2026" or "Sep 27, 2026")
+  try {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return formatDateToYMD(d);
+    }
+  } catch {
+    // ignore
+  }
+
+  return "";
+}
+
 export { formatDate, formatDateTime } from "./utils";
+

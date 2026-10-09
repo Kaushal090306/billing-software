@@ -26,7 +26,12 @@ import {
   getProperInvoicePdfFilename,
   getProperZipArchiveFilename,
 } from "@/lib/pdf-download";
-import { formatINR, formatNumber } from "@/lib/billing-utils";
+import {
+  formatINR,
+  formatNumber,
+  formatDateToYMD,
+  normalizeDateToYMD,
+} from "@/lib/billing-utils";
 import {
   Archive,
   Calendar,
@@ -106,32 +111,28 @@ export function BatchInvoiceZipModal({
   const offscreenContainerRef = useRef<HTMLDivElement>(null);
   const cancelGenerationRef = useRef(false);
 
-  // Setup Date Presets
+  // Setup Date Presets using local dates to avoid UTC offset shifts
   const applyPreset = (preset: PeriodPreset) => {
     setPeriodPreset(preset);
     const now = new Date();
     const year = now.getFullYear();
-    const month = now.getMonth(); // 0-indexed
+    const month = now.getMonth(); // 0-indexed (0 = Jan, 8 = Sep, 9 = Oct...)
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
 
     if (preset === "this_month") {
-      const start = new Date(year, month, 1).toISOString().split("T")[0];
-      const end = new Date(year, month + 1, 0).toISOString().split("T")[0];
-      const monthNames = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-      ];
+      const start = formatDateToYMD(new Date(year, month, 1));
+      const end = formatDateToYMD(new Date(year, month + 1, 0));
       setStartDate(start);
       setEndDate(end);
       setPeriodLabel(`${monthNames[month]}_${year}`);
     } else if (preset === "last_month") {
       const prevMonth = month === 0 ? 11 : month - 1;
       const prevYear = month === 0 ? year - 1 : year;
-      const start = new Date(prevYear, prevMonth, 1).toISOString().split("T")[0];
-      const end = new Date(prevYear, prevMonth + 1, 0).toISOString().split("T")[0];
-      const monthNames = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-      ];
+      const start = formatDateToYMD(new Date(prevYear, prevMonth, 1));
+      const end = formatDateToYMD(new Date(prevYear, prevMonth + 1, 0));
       setStartDate(start);
       setEndDate(end);
       setPeriodLabel(`${monthNames[prevMonth]}_${prevYear}`);
@@ -145,14 +146,14 @@ export function BatchInvoiceZipModal({
       setEndDate(end);
       setPeriodLabel(`FY${fyStartYear}-${String(fyEndYear).slice(2)}`);
     } else if (preset === "last_30_days") {
-      const end = now.toISOString().split("T")[0];
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const start = thirtyDaysAgo.toISOString().split("T")[0];
+      const end = formatDateToYMD(now);
+      const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+      const start = formatDateToYMD(thirtyDaysAgo);
       setStartDate(start);
       setEndDate(end);
       setPeriodLabel(`Last_30_Days`);
     } else if (preset === "today") {
-      const today = now.toISOString().split("T")[0];
+      const today = formatDateToYMD(now);
       setStartDate(today);
       setEndDate(today);
       setPeriodLabel(`Today_${today}`);
@@ -199,23 +200,35 @@ export function BatchInvoiceZipModal({
 
   // Filter invoices based on date range and filters
   const matchingInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      // 1. Date range filter
-      if (startDate && inv.date < startDate) return false;
-      if (endDate && inv.date > endDate) return false;
+    return invoices
+      .filter((inv) => {
+        // 1. Date range filter (using normalized YYYY-MM-DD for accurate comparison)
+        const invYMD =
+          normalizeDateToYMD(inv.date) ||
+          normalizeDateToYMD(inv.createdAt) ||
+          "";
 
-      // 2. Bill type filter
-      const isRaw = inv.billType === "raw";
-      if (billTypeFilter === "gst" && isRaw) return false;
-      if (billTypeFilter === "raw" && !isRaw) return false;
+        if (startDate && (!invYMD || invYMD < startDate)) return false;
+        if (endDate && (!invYMD || invYMD > endDate)) return false;
 
-      // 3. Customer filter
-      if (selectedCustomerId !== "all" && inv.customerId !== selectedCustomerId) {
-        return false;
-      }
+        // 2. Bill type filter
+        const isRaw = inv.billType === "raw";
+        if (billTypeFilter === "gst" && isRaw) return false;
+        if (billTypeFilter === "raw" && !isRaw) return false;
 
-      return true;
-    });
+        // 3. Customer filter
+        if (selectedCustomerId !== "all" && inv.customerId !== selectedCustomerId) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const aDate = normalizeDateToYMD(a.date) || normalizeDateToYMD(a.createdAt) || "";
+        const bDate = normalizeDateToYMD(b.date) || normalizeDateToYMD(b.createdAt) || "";
+        if (aDate !== bDate) return aDate.localeCompare(bDate);
+        return a.invoiceNo.localeCompare(b.invoiceNo, undefined, { numeric: true });
+      });
   }, [invoices, startDate, endDate, billTypeFilter, selectedCustomerId]);
 
   // Auto-select all matching invoices whenever matching list changes
@@ -434,30 +447,37 @@ export function BatchInvoiceZipModal({
               <span>Select Period / Duration</span>
             </Label>
             <div className="flex flex-wrap items-center gap-1.5">
-              {(
-                [
+              {(() => {
+                const now = new Date();
+                const curM = now.getMonth();
+                const fyStart = curM >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+                const fyText = `This FY (${fyStart}–${String(fyStart + 1).slice(2)})`;
+
+                const presets: Array<{ id: PeriodPreset; label: string }> = [
                   { id: "this_month", label: "This Month" },
                   { id: "last_month", label: "Last Month" },
-                  { id: "this_fy", label: "This FY (2026-27)" },
+                  { id: "this_fy", label: fyText },
                   { id: "last_30_days", label: "Last 30 Days" },
                   { id: "today", label: "Today" },
                   { id: "custom", label: "Custom Range" },
-                ] as const
-              ).map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => applyPreset(preset.id)}
-                  disabled={isGenerating}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                    periodPreset === preset.id
-                      ? "bg-purple-600 text-white shadow-xs"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
+                ];
+
+                return presets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyPreset(preset.id)}
+                    disabled={isGenerating}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                      periodPreset === preset.id
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ));
+              })()}
             </div>
           </div>
 

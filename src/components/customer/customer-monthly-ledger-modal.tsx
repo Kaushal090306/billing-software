@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef } from "react";
 import { Customer, Invoice, PaymentRecord, BusinessSettings, BillingStore } from "@/lib/store";
-import { formatINR, formatNumber } from "@/lib/billing-utils";
+import { formatINR, formatNumber, normalizeDateToYMD } from "@/lib/billing-utils";
 import {
   Dialog,
   DialogContent,
@@ -78,14 +78,16 @@ export function CustomerMonthlyLedgerModal({
     monthSet.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
 
     customerInvoices.forEach((inv) => {
-      if (inv.date && inv.date.length >= 7) {
-        monthSet.add(inv.date.substring(0, 7));
+      const d = normalizeDateToYMD(inv.date) || normalizeDateToYMD(inv.createdAt);
+      if (d && d.length >= 7) {
+        monthSet.add(d.substring(0, 7));
       }
     });
 
     customerPayments.forEach((p) => {
-      if (p.paymentDate && p.paymentDate.length >= 7) {
-        monthSet.add(p.paymentDate.substring(0, 7));
+      const d = normalizeDateToYMD(p.paymentDate) || normalizeDateToYMD(p.createdAt);
+      if (d && d.length >= 7) {
+        monthSet.add(d.substring(0, 7));
       }
     });
 
@@ -99,6 +101,7 @@ export function CustomerMonthlyLedgerModal({
     const rawEntries: Array<{
       id: string;
       date: string;
+      normalizedDate: string;
       type: "OPENING" | "INVOICE" | "PAYMENT";
       billType?: "gst" | "raw";
       reference: string;
@@ -110,10 +113,13 @@ export function CustomerMonthlyLedgerModal({
 
     // Opening balance
     if ((customer.openingBalance || 0) > 0) {
-      const openDate = customer.createdAt ? customer.createdAt.split("T")[0] : "2026-04-01";
+      const openDate = customer.createdAt
+        ? normalizeDateToYMD(customer.createdAt)
+        : "2026-04-01";
       rawEntries.push({
         id: "opening",
         date: openDate,
+        normalizedDate: openDate,
         type: "OPENING",
         reference: "Opening Balance",
         debit: customer.openingBalance,
@@ -128,9 +134,16 @@ export function CustomerMonthlyLedgerModal({
       if (filterType === "gst" && inv.billType === "raw") return;
       if (filterType === "raw" && inv.billType !== "raw") return;
 
+      const normDate =
+        normalizeDateToYMD(inv.date) || normalizeDateToYMD(inv.createdAt) || "";
+      const timestamp = normDate
+        ? new Date(normDate).getTime()
+        : new Date(inv.createdAt || 0).getTime();
+
       rawEntries.push({
         id: inv.id,
         date: inv.date,
+        normalizedDate: normDate,
         type: "INVOICE",
         billType: inv.billType === "raw" ? "raw" : "gst",
         reference: inv.invoiceNo,
@@ -140,20 +153,27 @@ export function CustomerMonthlyLedgerModal({
           inv.billType === "raw"
             ? `Raw Bill (${inv.items.length} items, Qty: ${inv.totalQuantity})`
             : `Tax Invoice (${inv.items.length} items, Qty: ${inv.totalQuantity})`,
-        rawTimestamp: new Date(inv.createdAt || inv.date).getTime(),
+        rawTimestamp: isNaN(timestamp) ? 0 : timestamp,
       });
     });
 
     customerPayments.forEach((p) => {
+      const normDate =
+        normalizeDateToYMD(p.paymentDate) || normalizeDateToYMD(p.createdAt) || "";
+      const timestamp = normDate
+        ? new Date(normDate).getTime()
+        : new Date(p.createdAt || 0).getTime();
+
       rawEntries.push({
         id: p.id,
         date: p.paymentDate,
+        normalizedDate: normDate,
         type: "PAYMENT",
         reference: p.referenceNo || p.invoiceNo || "Payment",
         debit: 0,
         credit: p.amount,
         notes: `${p.paymentMode} received`,
-        rawTimestamp: new Date(p.createdAt || p.paymentDate).getTime(),
+        rawTimestamp: isNaN(timestamp) ? 0 : timestamp,
       });
     });
 
@@ -195,13 +215,18 @@ export function CustomerMonthlyLedgerModal({
     // Calculate opening balance before this month
     let openingBeforeMonth = 0;
     for (const entry of fullLedger) {
-      if (entry.date < startOfMonth) {
+      if (entry.normalizedDate && entry.normalizedDate < startOfMonth) {
         openingBeforeMonth += entry.debit - entry.credit;
       }
     }
 
     // Entries in this month
-    const inMonth = fullLedger.filter((e) => e.date.startsWith(selectedMonth) && e.type !== "OPENING");
+    const inMonth = fullLedger.filter(
+      (e) =>
+        e.normalizedDate &&
+        e.normalizedDate.startsWith(selectedMonth) &&
+        e.type !== "OPENING"
+    );
 
     let deb = 0;
     let cred = 0;
