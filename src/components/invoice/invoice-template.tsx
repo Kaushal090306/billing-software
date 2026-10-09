@@ -620,6 +620,33 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     const logoInputRef = useRef<HTMLInputElement>(null);
     const sigInputRef = useRef<HTMLInputElement>(null);
     const qrInputRef = useRef<HTMLInputElement>(null);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const tableRef = useRef<HTMLTableElement>(null);
+    const fillerRowRef = useRef<HTMLTableRowElement>(null);
+
+    // Dynamically adjust table filler row so product table height expands to fill
+    // the section cleanly with continuous vertical column borders and ZERO padding below it
+    useEffect(() => {
+      const adjustTableHeight = () => {
+        if (!tableRef.current || !tableContainerRef.current) return;
+        const containerH = tableContainerRef.current.clientHeight;
+        const tableH = tableRef.current.offsetHeight;
+        const gap = containerH - tableH;
+
+        if (gap > 2 && fillerRowRef.current) {
+          const currentH = fillerRowRef.current.offsetHeight || 0;
+          const targetH = Math.max(currentH + gap, gap);
+          fillerRowRef.current.style.height = `${targetH}px`;
+          Array.from(fillerRowRef.current.children).forEach((td) => {
+            (td as HTMLElement).style.height = `${targetH}px`;
+          });
+        }
+      };
+
+      adjustTableHeight();
+      const timer = setTimeout(adjustTableHeight, 60);
+      return () => clearTimeout(timer);
+    }, [invoice.id, invoice.items?.length, template.tableDensity]);
 
     const isInterstate =
       Boolean(invoice.customerStateCode) &&
@@ -733,10 +760,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     // Dynamic spacer calculation to fill middle section cleanly
     const minRows =
       template.tableDensity === "compact"
-        ? 22
+        ? 26
         : template.tableDensity === "spacious"
-          ? 14
-          : 18;
+          ? 18
+          : 22;
     const emptyRowsCount = Math.max(0, minRows - (invoice.items?.length || 0));
 
     // Custom fields grouped by placement
@@ -823,6 +850,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       return (
         <div
           key={sectionId}
+          data-section-id={sectionId}
           ref={(el) => {
             sectionRefs.current[sectionId] = el;
           }}
@@ -1867,8 +1895,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       return renderSectionWrapper(
         "items_table",
         "Products Table",
-        <div className="w-full flex-1 h-full flex flex-col justify-between relative">
-          <table className="w-full h-full table-fixed border-collapse text-[1em] leading-tight" style={{ borderColor }}>
+        <div ref={tableContainerRef} className="w-full flex-1 h-full flex flex-col justify-start relative">
+          <table ref={tableRef} className="w-full h-full table-fixed border-collapse text-[1em] leading-tight" style={{ borderColor }}>
             <thead>
               <tr
                 className="border-b-2 font-black text-center text-[1em] h-7"
@@ -2108,8 +2136,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </tr>
               ))}
 
-              {/* Dynamic filler row that absorbs 100% of remaining table height so column borders extend continuously to the total bar */}
-              <tr style={{ height: "100%" }}>
+              {/* Dynamic filler row that absorbs remaining table height so column borders extend continuously to the total bar */}
+              <tr ref={fillerRowRef} className="table-filler-row" data-filler="true" style={{ minHeight: "4px" }}>
                 <td className="border-r" style={{ borderColor }}></td>
                 <td className="border-r" style={{ borderColor }}></td>
                 <td className="border-r" style={{ borderColor }}></td>

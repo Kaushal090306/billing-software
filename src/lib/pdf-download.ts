@@ -104,6 +104,10 @@ export async function generateInvoicePDF(
     }
     await new Promise((r) => setTimeout(r, 100));
 
+    // Dynamically expand product table height to absorb all remaining space
+    // so there is ZERO blank gap/padding between the TOTAL bar and the summary section below it.
+    expandTableToFillSection(clone);
+
     // Capture pristine 300dpi image from sandbox
     const measuredHeight = Math.max(clone.scrollHeight, clone.offsetHeight, 1123);
 
@@ -228,6 +232,9 @@ export function printInvoiceElement(elementIdOrRef: HTMLElement | string) {
   printSandbox.appendChild(clone);
   document.body.appendChild(printSandbox);
 
+  // Expand table height so print sheet has continuous borders and no awkward gaps
+  expandTableToFillSection(clone);
+
   const cleanup = () => {
     if (document.body.contains(printSandbox)) {
       document.body.removeChild(printSandbox);
@@ -243,6 +250,76 @@ export function printInvoiceElement(elementIdOrRef: HTMLElement | string) {
     // Fallback cleanup in case afterprint does not fire in some browsers
     setTimeout(cleanup, 4000);
   }, 120);
+}
+
+/**
+ * Automatically adjusts the product table height to absorb all remaining space in the invoice container,
+ * ensuring continuous column border lines and eliminating any awkward padding/gap between the TOTAL bar
+ * and the tax/summary/bank section.
+ */
+export function expandTableToFillSection(rootEl: HTMLElement) {
+  try {
+    const tableEl = rootEl.querySelector("table");
+    const tableSec = (rootEl.querySelector('[data-section-id="items_table"]') ||
+      tableEl?.closest(".group\\/sec") ||
+      tableEl?.parentElement?.parentElement) as HTMLElement | null;
+
+    if (!tableEl || !tableSec) return;
+
+    // Reset filler row height before measuring
+    const fillerRow = tableEl.querySelector(".table-filler-row") as HTMLElement | null;
+    if (fillerRow) {
+      fillerRow.style.height = "0px";
+      Array.from(fillerRow.children).forEach((cell) => {
+        (cell as HTMLElement).style.height = "0px";
+      });
+    }
+
+    const secHeight = tableSec.clientHeight || tableSec.offsetHeight;
+    const tblHeight = tableEl.offsetHeight;
+    const gap = secHeight - tblHeight;
+
+    if (gap > 2) {
+      const tbody = tableEl.querySelector("tbody");
+      const rowH = 24; // standard table row height (px)
+      const borderColor = tableEl.style.borderColor || "#000000";
+
+      // If gap is large enough for full rows, insert real empty rows before the filler row
+      if (tbody && fillerRow && gap >= rowH) {
+        const numRowsToAdd = Math.floor(gap / rowH);
+        const remainingPx = gap % rowH;
+
+        for (let r = 0; r < numRowsToAdd; r++) {
+          const tr = document.createElement("tr");
+          tr.className = "h-6";
+          tr.style.height = `${rowH}px`;
+          tr.innerHTML = `
+            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
+            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
+            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
+            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
+            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
+            <td style="height: ${rowH}px"></td>
+          `;
+          tbody.insertBefore(tr, fillerRow);
+        }
+
+        if (remainingPx > 0) {
+          fillerRow.style.height = `${remainingPx}px`;
+          Array.from(fillerRow.children).forEach((cell) => {
+            (cell as HTMLElement).style.height = `${remainingPx}px`;
+          });
+        }
+      } else if (fillerRow) {
+        fillerRow.style.height = `${gap}px`;
+        Array.from(fillerRow.children).forEach((cell) => {
+          (cell as HTMLElement).style.height = `${gap}px`;
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Could not expand table height in sandbox:", err);
+  }
 }
 
 export interface WhatsAppInvoiceShareParams {
