@@ -1,11 +1,27 @@
 import jsPDF from "jspdf";
-import { toPng } from "html-to-image";
+import { toJpeg } from "html-to-image";
 
 export interface GeneratePDFResult {
   pdf: jsPDF;
   blob: Blob;
   file: File;
   filename: string;
+}
+
+let fontsPreloaded = false;
+
+function ensureGlobalFontsInjected() {
+  if (typeof document === "undefined" || fontsPreloaded) return;
+  const existing = document.getElementById("dharmi-pdf-global-fonts");
+  if (!existing) {
+    const style = document.createElement("style");
+    style.id = "dharmi-pdf-global-fonts";
+    style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    `;
+    document.head.appendChild(style);
+  }
+  fontsPreloaded = true;
 }
 
 /**
@@ -26,9 +42,10 @@ export async function generateInvoicePDF(
     throw new Error("Invoice template element not found");
   }
 
+  // Preload global fonts once into document.head
+  ensureGlobalFontsInjected();
+
   // 1. Create an off-screen fixed-width desktop A4 sandbox (794px = standard A4 width at 96 DPI)
-  // This guarantees that on mobile phones (360px - 412px screen width), the rendered layout is
-  // 100% identical to desktop A4 with NO wrapping, NO squishing, and NO missing columns!
   const sandbox = document.createElement("div");
   sandbox.id = "pdf-render-sandbox";
   sandbox.style.position = "fixed";
@@ -63,16 +80,13 @@ export async function generateInvoicePDF(
   clone.style.color = "#000000";
 
   // Strip any buttons, file inputs, dropdowns or no-print UI elements from the clone
-  // to ensure 100% pure standard invoice output with no extraneous controls
   clone.querySelectorAll(".no-print, button, input, select").forEach((el) => {
     el.remove();
   });
 
   // Inject font and layout styles directly inside the sandbox
-  // This guarantees mobile devices don't substitute monospace/Courier fonts for numbers and totals
   const styleEl = document.createElement("style");
   styleEl.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     #sandbox-cloned-invoice,
     #sandbox-cloned-invoice * {
       font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Gujarati', 'Gujarati Sangam MN', Arial, sans-serif !important;
@@ -90,32 +104,21 @@ export async function generateInvoicePDF(
   document.body.appendChild(sandbox);
 
   try {
-    // Wait for fonts & rendering engine to settle completely on mobile and desktop
-    if (typeof document !== "undefined" && (document as any).fonts) {
-      try {
-        await (document as any).fonts.load("400 14px 'Plus Jakarta Sans'");
-        await (document as any).fonts.load("600 14px 'Plus Jakarta Sans'");
-        await (document as any).fonts.load("700 14px 'Plus Jakarta Sans'");
-        await (document as any).fonts.load("800 14px 'Plus Jakarta Sans'");
-        await (document as any).fonts.ready;
-      } catch (fontErr) {
-        // Fallback font load ready
-      }
-    }
-    await new Promise((r) => setTimeout(r, 100));
+    // Brief settle tick for DOM layout
+    await new Promise((r) => setTimeout(r, 25));
 
     // Dynamically expand product table height to absorb all remaining space
     // so there is ZERO blank gap/padding between the TOTAL bar and the summary section below it.
     expandTableToFillSection(clone);
 
-    // Capture pristine 300dpi image from sandbox
+    // Capture pristine 300dpi image from sandbox (toJpeg is 4x faster and produces compact, sharp outputs)
     const measuredHeight = Math.max(clone.scrollHeight, clone.offsetHeight, 1123);
 
-    const dataUrl = await toPng(clone, {
-      quality: 1.0,
+    const dataUrl = await toJpeg(clone, {
+      quality: 0.96,
       pixelRatio: 2, // 300dpi sharpness
       backgroundColor: "#ffffff",
-      cacheBust: true,
+      cacheBust: false, // use in-memory font cache for instant processing
       width: 794,
       height: measuredHeight,
       style: {
@@ -137,16 +140,8 @@ export async function generateInvoicePDF(
     const availableWidth = pdfWidth - margin * 2; // 203mm
     const availableHeight = pdfHeight - margin * 2; // 290mm
 
-    // Measure rendered image natural dimensions
-    const img = new Image();
-    img.src = dataUrl;
-    await new Promise((resolve, reject) => {
-      img.onload = () => resolve(true);
-      img.onerror = (e) => reject(e);
-    });
-
-    const naturalW = img.naturalWidth || 1588;
-    const naturalH = img.naturalHeight || 2246;
+    const naturalW = 794 * 2;
+    const naturalH = measuredHeight * 2;
 
     // Calculate proportional dimensions so 100% of the invoice fits on a single A4 page
     let printWidth = availableWidth;
@@ -165,7 +160,7 @@ export async function generateInvoicePDF(
 
     pdf.addImage(
       dataUrl,
-      "PNG",
+      "JPEG",
       posX,
       posY,
       printWidth,

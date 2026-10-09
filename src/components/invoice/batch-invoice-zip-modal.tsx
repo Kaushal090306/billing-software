@@ -351,7 +351,7 @@ export function BatchInvoiceZipModal({
         });
 
         // Wait brief tick for React commit and canvas/monogram rendering
-        await new Promise((r) => setTimeout(r, 65));
+        await new Promise((r) => setTimeout(r, 20));
 
         const targetEl =
           batchTemplateRef.current ||
@@ -380,7 +380,7 @@ export function BatchInvoiceZipModal({
       const zipBlob = await zip.generateAsync({
         type: "blob",
         compression: "DEFLATE",
-        compressionOptions: { level: 6 },
+        compressionOptions: { level: 1 },
       });
 
       // Trigger standard browser download
