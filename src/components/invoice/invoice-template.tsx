@@ -1309,17 +1309,17 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               )}
             </p>
             {!isRaw && (
-              <div className="text-[1.32em] font-bold tracking-tight mt-1 flex items-center justify-center gap-5 flex-wrap">
+              <div className="text-[1.5em] font-extrabold tracking-tight mt-1 flex items-center justify-center gap-6 flex-wrap">
                 <div>
                   GSTIN No.{" "}
-                  <span className="font-mono font-black text-[1.45em]">
+                  <span className="font-mono font-black text-[1.62em]">
                     {renderET(
                       "company_gstin",
                       "Company GSTIN",
                       companyGstin,
                       (val) => onUpdateSettings?.({ gstin: val }),
                       {
-                        defaultFontSizePx: 15.0,
+                        defaultFontSizePx: 17.5,
                         uppercase: true,
                         tooltip: "Click to edit Company GSTIN",
                       }
@@ -1329,14 +1329,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 {companyPan && companyPan.length > 0 && (
                   <div>
                     PAN No.{" "}
-                    <span className="font-mono font-black text-[1.45em]">
+                    <span className="font-mono font-black text-[1.62em]">
                       {renderET(
                         "company_pan",
                         "Company PAN",
                         companyPan,
                         (val) => onUpdateSettings?.({ pan: val }),
                         {
-                          defaultFontSizePx: 15.0,
+                          defaultFontSizePx: 17.5,
                           uppercase: true,
                           tooltip: "Click to edit Company PAN",
                         }
@@ -2146,14 +2146,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
               {/* Total Summary Row */}
               <tr
-                className="border-t-2 border-b-2 font-black text-[1.25em] h-9"
+                className="border-t-2 border-b-2 font-black text-[1.12em] h-8"
                 style={{ borderColor }}
               >
                 {isRaw ? (
                   <>
                     <td
                       colSpan={3}
-                      className="border-r py-1 px-2 text-center uppercase font-black text-[1.42em]"
+                      className="border-r py-1 px-2 text-center uppercase font-black text-[1.20em]"
                       style={{ borderColor }}
                     >
                       {renderET(
@@ -2162,13 +2162,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         "Total",
                         undefined,
                         {
-                          defaultFontSizePx: 15.0,
+                          defaultFontSizePx: 12.5,
                           uppercase: true,
                         }
                       )}
                     </td>
                     <td
-                      className="border-r py-1 px-1.5 text-right font-mono font-black text-[1.52em] tabular-nums"
+                      className="border-r py-1 px-1.5 text-right font-mono font-black text-[1.32em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.totalQuantity, 3)}
@@ -2178,7 +2178,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       style={{ borderColor }}
                     ></td>
                     <td
-                      className="py-1 px-1.5 text-right font-mono font-black text-[1.62em] tabular-nums"
+                      className="py-1 px-2 text-right font-mono font-black text-[1.36em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.grandTotal, 2)}
@@ -2188,7 +2188,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   <>
                     <td
                       colSpan={3}
-                      className="border-r py-1 px-2 text-center uppercase font-black text-[1.42em]"
+                      className="border-r py-1 px-2 text-center uppercase font-black text-[1.20em]"
                       style={{ borderColor }}
                     >
                       {renderET(
@@ -2197,13 +2197,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                         "Total",
                         undefined,
                         {
-                          defaultFontSizePx: 15.0,
+                          defaultFontSizePx: 12.5,
                           uppercase: true,
                         }
                       )}
                     </td>
                     <td
-                      className="border-r py-1 px-1.5 text-right font-mono font-black text-[1.52em] tabular-nums"
+                      className="border-r py-1 px-1.5 text-right font-mono font-black text-[1.32em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.totalQuantity, 3)}
@@ -2213,7 +2213,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       style={{ borderColor }}
                     ></td>
                     <td
-                      className="py-1 px-1.5 text-right font-mono font-black text-[1.62em] tabular-nums"
+                      className="py-1 px-2 text-right font-mono font-black text-[1.36em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.totalTaxable, 2)}
