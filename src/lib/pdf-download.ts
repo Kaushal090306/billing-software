@@ -254,7 +254,7 @@ export function printInvoiceElement(elementIdOrRef: HTMLElement | string) {
  */
 export function expandTableToFillSection(rootEl: HTMLElement) {
   try {
-    const tableEl = rootEl.querySelector("table");
+    const tableEl = (rootEl.querySelector(".invoice-products-table") || rootEl.querySelector("table")) as HTMLElement | null;
     const tableSec = (rootEl.querySelector('[data-section-id="items_table"]') ||
       tableEl?.closest(".group\\/sec") ||
       tableEl?.parentElement?.parentElement) as HTMLElement | null;
@@ -276,7 +276,7 @@ export function expandTableToFillSection(rootEl: HTMLElement) {
 
     if (gap > 2) {
       const tbody = tableEl.querySelector("tbody");
-      const rowH = 24; // standard table row height (px)
+      const rowH = 28; // standard table row height (px)
       const borderColor = tableEl.style.borderColor || "#000000";
 
       // If gap is large enough for full rows, insert real empty rows before the filler row
