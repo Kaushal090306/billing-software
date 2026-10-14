@@ -1275,7 +1275,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           {/* Center: Company Name, Address & GSTIN (Vertically Centered with generous vertical padding) */}
           <div className="flex-1 text-center px-4 flex flex-col justify-center items-center">
             <h1
-              className="text-[3.9em] font-black tracking-tight uppercase leading-none font-serif mb-2"
+              className="text-[3.85em] font-black tracking-tight uppercase leading-none font-serif mb-2"
               style={{
                 color:
                   template.themeColor !== "#000000"
