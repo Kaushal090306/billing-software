@@ -1273,9 +1273,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           </div>
 
           {/* Center: Company Name, Address & GSTIN (Vertically Centered with generous vertical padding) */}
-          <div className="flex-1 text-center px-4 flex flex-col justify-center items-center">
+          <div className="flex-1 text-center px-2 flex flex-col justify-center items-center">
             <h1
-              className="text-[3.85em] font-black tracking-tight uppercase leading-none font-serif mb-2"
+              className="text-[4.4em] font-black tracking-tight uppercase leading-none font-serif mb-2"
               style={{
                 color:
                   template.themeColor !== "#000000"
@@ -1289,7 +1289,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 companyTitle,
                 (val) => onUpdateSettings?.({ companyName: val }),
                 {
-                  defaultFontSizePx: 38.0,
+                  defaultFontSizePx: 44.0,
                   uppercase: true,
                   tooltip: "Click to edit Company Legal Name",
                 }
@@ -1309,17 +1309,17 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               )}
             </p>
             {!isRaw && (
-              <div className="text-[1.38em] font-extrabold tracking-tight mt-1 flex items-center justify-center gap-6 flex-nowrap whitespace-nowrap">
+              <div className="mt-1 flex items-center justify-center gap-6 flex-nowrap whitespace-nowrap">
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="font-black text-slate-900">GSTIN No.</span>
-                  <span className="font-mono font-black text-[1.32em] tracking-tight">
+                  <span className="text-[1.12em] font-bold text-slate-700 tracking-tight">GSTIN No.</span>
+                  <span className="font-mono font-black text-[1.5em] tracking-wide text-black">
                     {renderET(
                       "company_gstin",
                       "Company GSTIN",
                       companyGstin,
                       (val) => onUpdateSettings?.({ gstin: val }),
                       {
-                        defaultFontSizePx: 18.5,
+                        defaultFontSizePx: 21.0,
                         uppercase: true,
                         tooltip: "Click to edit Company GSTIN",
                       }
@@ -1328,15 +1328,15 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
                 {companyPan && companyPan.length > 0 && (
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="font-black text-slate-900">PAN No.</span>
-                    <span className="font-mono font-black text-[1.32em] tracking-tight">
+                    <span className="text-[1.12em] font-bold text-slate-700 tracking-tight">PAN No.</span>
+                    <span className="font-mono font-black text-[1.5em] tracking-wide text-black">
                       {renderET(
                         "company_pan",
                         "Company PAN",
                         companyPan,
                         (val) => onUpdateSettings?.({ pan: val }),
                         {
-                          defaultFontSizePx: 18.5,
+                          defaultFontSizePx: 21.0,
                           uppercase: true,
                           tooltip: "Click to edit Company PAN",
                         }
