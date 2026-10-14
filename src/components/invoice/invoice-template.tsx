@@ -432,7 +432,7 @@ function EditableText({
     ...style,
     fontSize:
       custom?.fontSizePx !== undefined
-        ? `${Math.max(custom.fontSizePx, defaultFontSizePx || 0)}px`
+        ? `${custom.fontSizePx}px`
         : style?.fontSize || (defaultFontSizePx ? `${defaultFontSizePx}px` : undefined),
     fontFamily: custom?.fontFamily
       ? getFontFamilyCSS(custom.fontFamily)
@@ -1309,17 +1309,17 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               )}
             </p>
             {!isRaw && (
-              <div className="text-[1.65em] font-extrabold tracking-tight mt-1.5 flex items-center justify-center gap-7 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-slate-900 tracking-tight">GSTIN No. :</span>
-                  <span className="font-mono font-black text-[1.25em] tracking-wider text-black">
+              <div className="text-[1.28em] font-bold tracking-tight mt-1 flex items-center justify-center gap-5 flex-nowrap whitespace-nowrap">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span>GSTIN No.</span>
+                  <span className="font-mono font-black text-[1.18em]">
                     {renderET(
                       "company_gstin",
                       "Company GSTIN",
                       companyGstin,
                       (val) => onUpdateSettings?.({ gstin: val }),
                       {
-                        defaultFontSizePx: 22.0,
+                        defaultFontSizePx: 15.0,
                         uppercase: true,
                         tooltip: "Click to edit Company GSTIN",
                       }
@@ -1327,16 +1327,16 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   </span>
                 </div>
                 {companyPan && companyPan.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-slate-900 tracking-tight">PAN No. :</span>
-                    <span className="font-mono font-black text-[1.25em] tracking-wider text-black">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span>PAN No.</span>
+                    <span className="font-mono font-black text-[1.18em]">
                       {renderET(
                         "company_pan",
                         "Company PAN",
                         companyPan,
                         (val) => onUpdateSettings?.({ pan: val }),
                         {
-                          defaultFontSizePx: 22.0,
+                          defaultFontSizePx: 15.0,
                           uppercase: true,
                           tooltip: "Click to edit Company PAN",
                         }
