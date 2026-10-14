@@ -2368,8 +2368,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           </div>
 
           {/* Right Column: Tax Breakdown & Grand Total (38% width matching table columns 4-6: Qty 12% + Rate 12% + Taxable 14%) */}
-          <div className="flex flex-col justify-between h-full" style={{ width: "38%" }}>
-            <table className="w-full h-full border-collapse table-fixed text-[1.05em]" style={{ borderColor }}>
+          <div className="flex flex-col justify-between h-full min-h-[110px]" style={{ width: "38%" }}>
+            {/* Top: Tax Breakdown Table */}
+            <table className="w-full border-collapse table-fixed text-[1.05em]" style={{ borderColor }}>
               <colgroup>
                 <col style={{ width: "63.158%" }} />
                 <col style={{ width: "36.842%" }} />
@@ -2459,59 +2460,59 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     {formatNumber(invoice.roundOff || 0, 2)}
                   </td>
                 </tr>
-
-                {/* Empty filler row to absorb remaining space so vertical line is continuous */}
-                <tr style={{ height: "100%" }}>
-                  <td className="border-r" style={{ borderColor, width: "63.158%" }}></td>
-                  <td style={{ width: "36.842%" }}></td>
-                </tr>
-
-                {/* Total Bill Amount Row with prominent border-t-2 and vertical separator */}
-                <tr
-                  className="border-t-2 font-black"
-                  style={{
-                    borderColor,
-                    backgroundColor: "#f8fafc",
-                  }}
-                >
-                  <td
-                    className="border-r py-2 px-2.5 font-black uppercase text-[1.22em] tracking-tight"
-                    style={{ borderColor, width: "63.158%" }}
-                  >
-                    {renderET(
-                      "grand_total",
-                      "Total Bill Amount Label",
-                      "TOTAL BILL AMOUNT",
-                      undefined,
-                      {
-                        defaultFontSizePx: 13.0,
-                        uppercase: true,
-                      }
-                    )}
-                  </td>
-                  <td
-                    className="py-2 px-2.5 text-right font-black font-mono text-[1.65em] tabular-nums tracking-tight"
-                    style={{
-                      width: "36.842%",
-                      color:
-                        template.themeColor !== "#000000"
-                          ? template.themeColor
-                          : undefined,
-                    }}
-                  >
-                    {renderET(
-                      "grand_total",
-                      "Grand Total Value",
-                      formatNumber(invoice.grandTotal, 2),
-                      undefined,
-                      {
-                        defaultFontSizePx: 17.0,
-                      }
-                    )}
-                  </td>
-                </tr>
               </tbody>
             </table>
+
+            {/* Middle: Continuous Vertical Line Spacer absorbing all remaining height */}
+            <div className="flex-1 w-full flex min-h-[12px]">
+              <div
+                className="border-r"
+                style={{ borderColor, width: "63.158%" }}
+              />
+              <div style={{ width: "36.842%" }} />
+            </div>
+
+            {/* Bottom: Total Bill Amount Row Pinned Directly to Bottom */}
+            <div
+              className="w-full border-t-2 font-black flex items-stretch bg-slate-50/50"
+              style={{ borderColor }}
+            >
+              <div
+                className="border-r py-2 px-2.5 font-black uppercase text-[1.22em] tracking-tight flex items-center"
+                style={{ borderColor, width: "63.158%" }}
+              >
+                {renderET(
+                  "grand_total",
+                  "Total Bill Amount Label",
+                  "TOTAL BILL AMOUNT",
+                  undefined,
+                  {
+                    defaultFontSizePx: 13.0,
+                    uppercase: true,
+                  }
+                )}
+              </div>
+              <div
+                className="py-2 px-2.5 text-right font-black font-mono text-[1.65em] tabular-nums tracking-tight flex items-center justify-end"
+                style={{
+                  width: "36.842%",
+                  color:
+                    template.themeColor !== "#000000"
+                      ? template.themeColor
+                      : undefined,
+                }}
+              >
+                {renderET(
+                  "grand_total",
+                  "Grand Total Value",
+                  formatNumber(invoice.grandTotal, 2),
+                  undefined,
+                  {
+                    defaultFontSizePx: 17.0,
+                  }
+                )}
+              </div>
+            </div>
           </div>
         </div>
       );
