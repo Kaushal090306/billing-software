@@ -284,18 +284,21 @@ export function expandTableToFillSection(rootEl: HTMLElement) {
         const numRowsToAdd = Math.floor(gap / rowH);
         const remainingPx = gap % rowH;
 
+        const colCount = tableEl.querySelector("thead tr")?.children.length || 10;
+
         for (let r = 0; r < numRowsToAdd; r++) {
           const tr = document.createElement("tr");
           tr.className = "h-6";
           tr.style.height = `${rowH}px`;
-          tr.innerHTML = `
-            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
-            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
-            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
-            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
-            <td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>
-            <td style="height: ${rowH}px"></td>
-          `;
+          let cellsHtml = "";
+          for (let c = 0; c < colCount; c++) {
+            if (c < colCount - 1) {
+              cellsHtml += `<td class="border-r" style="border-color: ${borderColor}; height: ${rowH}px"></td>`;
+            } else {
+              cellsHtml += `<td style="height: ${rowH}px"></td>`;
+            }
+          }
+          tr.innerHTML = cellsHtml;
           tbody.insertBefore(tr, fillerRow);
         }
 

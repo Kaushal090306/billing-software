@@ -540,7 +540,7 @@ function EditableText({
 // MAIN INVOICE TEMPLATE COMPONENT
 // ---------------------------------------------------------------------------
 export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  (
+  function InvoiceTemplate(
     {
       invoice,
       settings,
@@ -559,9 +559,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       onToggleSection,
       onUpdateSectionPadding,
       onUpdateSectionHeight,
-    },
-    ref
-  ) => {
+    }: InvoiceTemplateProps,
+    ref: React.ForwardedRef<HTMLDivElement>
+  ): React.ReactElement | null {
     // Resolve template config with fallback to default
     const template: InvoiceTemplateConfig =
       templateConfig ||
@@ -1046,11 +1046,11 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         "brand_header",
         "Company Header & Logo",
         <div
-          className="w-full h-full flex items-center justify-between border-b-2 px-3.5 py-3 sm:py-4 min-h-[125px]"
+          className="w-full h-full flex items-center justify-between border-b-2 px-3.5 pt-0.5 pb-2 min-h-[88px]"
           style={{ borderColor }}
         >
           {/* Left: Dynamic Company Logo or Monogram */}
-          <div className="relative shrink-0 flex items-center justify-start">
+          <div className="relative shrink-0 flex items-center justify-start min-w-[105px]">
             <div
               onClick={() => interactive && setActivePopover("logo")}
               className={`relative ${interactive
@@ -1272,11 +1272,12 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             )}
           </div>
 
-          {/* Center: Company Name, Address & GSTIN (Vertically Centered with generous vertical padding) */}
-          <div className="flex-1 text-center px-2 flex flex-col justify-center items-center">
+          {/* Center: Company Name, Address & GSTIN */}
+          <div className="flex-1 text-center px-2 flex flex-col justify-start items-center overflow-hidden pt-0.5">
             <h1
-              className="text-[4.4em] font-black tracking-tight uppercase leading-none font-serif mb-2"
+              className="font-black uppercase leading-tight font-serif mt-0 mb-1 whitespace-nowrap text-[3.8em] sm:text-[4.4em] flex items-center justify-center tracking-[0.055em]"
               style={{
+                letterSpacing: "0.055em",
                 color:
                   template.themeColor !== "#000000"
                     ? template.themeColor
@@ -1289,8 +1290,11 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 companyTitle,
                 (val) => onUpdateSettings?.({ companyName: val }),
                 {
-                  defaultFontSizePx: 44.0,
+                  defaultFontSizePx: 42.0,
+                  className: "whitespace-nowrap font-serif font-black tracking-[0.055em]",
+                  style: { letterSpacing: "0.055em" },
                   uppercase: true,
+                  singleLine: true,
                   tooltip: "Click to edit Company Legal Name",
                 }
               )}
@@ -1348,101 +1352,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             )}
           </div>
 
-          {/* Right: Dynamic Bill QR Code (scannable to open bill PDF/view) */}
-          <div className="relative shrink-0 flex items-center justify-end">
-            {showQrCode ? (
-              <div
-                title="Scan with camera to open bill PDF/view"
-                className="flex flex-col items-center justify-center p-0 bg-transparent"
-              >
-                {headingQrUrl ? (
-                  <img
-                    src={headingQrUrl}
-                    alt="Invoice Link QR"
-                    className="w-18 h-18 object-contain"
-                  />
-                ) : (
-                  <div className="w-18 h-18 flex items-center justify-center text-[9px] font-bold">QR</div>
-                )}
-                <span className="text-[7.5px] font-bold text-center leading-none text-zinc-500 uppercase mt-0.5 tracking-tight">
-                  Scan for Bill
-                </span>
-              </div>
-            ) : null}
-
-            {/* In-Preview QR Customizer Popover */}
-            {interactive && activePopover === "qr" && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-full mt-2 w-64 p-3 bg-white dark:bg-zinc-900 border-2 border-purple-600 rounded-lg shadow-2xl z-50 text-xs space-y-2.5 animate-in fade-in text-foreground"
-              >
-                <div className="flex items-center justify-between border-b pb-1.5 font-bold text-foreground">
-                  <span className="flex items-center gap-1">
-                    <QrCode className="h-3.5 w-3.5 text-purple-600" />
-                    <span>Payment QR Code</span>
-                  </span>
-                  <button
-                    onClick={() => setActivePopover(null)}
-                    className="p-0.5 rounded hover:bg-muted cursor-pointer"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-muted-foreground">
-                    UPI Virtual Payment Address
-                  </label>
-                  <input
-                    type="text"
-                    value={upiId}
-                    onChange={(e) =>
-                      onUpdateSettings?.({ upiId: e.target.value })
-                    }
-                    placeholder="e.g. 9723544545@okbizaxis"
-                    className="w-full h-7 px-2 border rounded text-xs font-mono bg-background"
-                  />
-                </div>
-
-                {(settings.qrCodeUrl || headingQrUrl) && (
-                  <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded border flex items-center justify-center">
-                    <img
-                      src={settings.qrCodeUrl || headingQrUrl}
-                      alt="QR Preview"
-                      className="w-16 h-16 object-contain rounded"
-                    />
-                  </div>
-                )}
-
-                <label className="block w-full text-center py-2 px-3 border-2 border-dashed border-purple-400 hover:border-purple-600 rounded bg-purple-50/40 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold text-[11px] cursor-pointer">
-                  <Upload className="h-3.5 w-3.5 mx-auto mb-0.5" />
-                  <span>Upload Custom QR Image</span>
-                  <input
-                    ref={qrInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, "qrCodeUrl")}
-                    className="hidden"
-                  />
-                </label>
-
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    onClick={() => onUpdateTemplate?.({ showQrCode: false })}
-                    className="text-red-500 text-[10px] font-bold hover:underline cursor-pointer"
-                  >
-                    Hide QR Code
-                  </button>
-                  <button
-                    onClick={() => setActivePopover(null)}
-                    className="px-3 py-1 bg-purple-600 text-white rounded text-xs font-bold cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Right: Invisible spacer to balance left logo and keep center title perfectly centered */}
+          <div className="shrink-0 min-w-[105px] hidden sm:block invisible pointer-events-none" aria-hidden="true"></div>
         </div>
       );
     };
@@ -1890,14 +1801,38 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         template.tableHeaderStyle === "accent-filled" &&
         template.themeColor !== "#000000";
 
+      const colCount = isRaw ? 6 : isInterstate ? 9 : 10;
+
+      const totalNetItems = (invoice.items || []).reduce((sum, item) => {
+        const taxable = Number(item.taxableAmount || (Number(item.quantity || 0) * Number(item.rate || 0)));
+        const gstRate = Number(item.gstRate || 0);
+        const cgst = item.cgstAmount !== undefined && item.cgstAmount !== null
+          ? Number(item.cgstAmount)
+          : Math.round(taxable * (gstRate / 2)) / 100;
+        const sgst = item.sgstAmount !== undefined && item.sgstAmount !== null
+          ? Number(item.sgstAmount)
+          : Math.round(taxable * (gstRate / 2)) / 100;
+        const igst = item.igstAmount !== undefined && item.igstAmount !== null
+          ? Number(item.igstAmount)
+          : Math.round(taxable * gstRate) / 100;
+        const net = item.netAmount !== undefined && item.netAmount !== null && Number(item.netAmount) > 0
+          ? Number(item.netAmount)
+          : taxable + (isInterstate ? igst : (cgst + sgst));
+        return sum + net;
+      }, 0);
+
+      const totalCgstAmt = Number(invoice.totalCgst || 0) || (invoice.items || []).reduce((sum, it) => sum + Number(it.cgstAmount || 0), 0);
+      const totalSgstAmt = Number(invoice.totalSgst || 0) || (invoice.items || []).reduce((sum, it) => sum + Number(it.sgstAmount || 0), 0);
+      const totalIgstAmt = Number(invoice.totalIgst || 0) || (invoice.items || []).reduce((sum, it) => sum + Number(it.igstAmount || 0), 0);
+
       return renderSectionWrapper(
         "items_table",
         "Products Table",
         <div ref={tableContainerRef} className="w-full flex-1 h-full flex flex-col justify-start relative">
-          <table ref={tableRef} className="invoice-products-table w-full h-full table-fixed border-collapse text-[1.05em] leading-tight" style={{ borderColor }}>
+          <table ref={tableRef} className="invoice-products-table w-full h-full table-fixed border-collapse text-[1.08em] leading-snug" style={{ borderColor }}>
             <thead>
               <tr
-                className="border-b-2 font-black text-center text-[1.32em] h-9"
+                className="border-b-2 font-extrabold text-center text-[0.98em] sm:text-[1.02em] h-8 sm:h-9"
                 style={{
                   borderColor,
                   backgroundColor: isHeaderAccent
@@ -1909,213 +1844,424 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 {isRaw ? (
                   <>
                     <th
-                      className="border-r py-1.5 px-1 w-[5%] font-black"
+                      className="border-r py-1 px-1 w-[5%] font-bold text-center"
                       style={{ borderColor }}
                     >
                       Sr.
                     </th>
                     <th
-                      className="border-r py-1.5 px-2 text-left w-[45%] font-black tracking-tight"
+                      className="border-r py-1 px-2 text-left w-[45%] font-bold tracking-tight"
                       style={{ borderColor }}
                     >
                       Product Name
                     </th>
                     <th
-                      className="border-r py-1.5 px-1 w-[12%] font-black"
+                      className="border-r py-1 px-1 w-[12%] font-bold text-center"
                       style={{ borderColor }}
                     >
                       HSN
                     </th>
                     <th
-                      className="border-r py-1.5 px-1 w-[12%] font-black"
+                      className="border-r py-1 px-1 w-[12%] font-bold text-center"
                       style={{ borderColor }}
                     >
                       Qty
                     </th>
                     <th
-                      className="border-r py-1.5 px-1 w-[12%] font-black"
+                      className="border-r py-1 px-1 w-[12%] font-bold text-center"
                       style={{ borderColor }}
                     >
                       Rate
                     </th>
                     <th
-                      className="py-1.5 px-1 w-[14%] font-black tracking-tight"
+                      className="py-1 px-1 w-[14%] font-bold text-center tracking-tight"
                       style={{ borderColor }}
                     >
                       Total
                     </th>
                   </>
-                ) : (
+                ) : !isInterstate ? (
                   <>
                     <th
-                      className="border-r py-1.5 px-1 w-[5%] font-black"
-                      style={{ borderColor }}
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "4%", borderColor }}
                     >
                       Sr.
                     </th>
                     <th
-                      className="border-r py-1.5 px-2 text-left w-[45%] font-black tracking-tight"
-                      style={{ borderColor }}
+                      className="border-r py-1 px-1.5 text-left font-bold tracking-tight"
+                      style={{ width: "21%", borderColor }}
                     >
                       Product Name
                     </th>
                     <th
-                      className="border-r py-1.5 px-1 w-[12%] font-black"
-                      style={{ borderColor }}
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "7.5%", borderColor }}
                     >
                       HSN
                     </th>
                     <th
-                      className="border-r py-1.5 px-1 w-[12%] font-black"
-                      style={{ borderColor }}
+                      className="border-r py-0.5 px-0.5 font-bold text-center leading-tight"
+                      style={{ width: "9%", borderColor }}
                     >
-                      Qty.
+                      <div>Nt.Wt.</div>
+                      <div className="text-[0.84em] font-bold text-slate-700">Pcs/Box</div>
                     </th>
                     <th
-                      className="border-r py-1.5 px-1 w-[12%] font-black"
-                      style={{ borderColor }}
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "8.5%", borderColor }}
                     >
                       Rate
                     </th>
                     <th
-                      className="py-1.5 px-1 w-[14%] font-black tracking-tight"
-                      style={{ borderColor }}
+                      className="border-r py-1 px-1 font-bold text-center"
+                      style={{ width: "13%", borderColor }}
                     >
                       Taxable Amount
+                    </th>
+                    <th
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "6%", borderColor }}
+                    >
+                      GST %
+                    </th>
+                    <th
+                      className="border-r py-0.5 px-0.5 font-bold text-center leading-tight"
+                      style={{ width: "9.5%", borderColor }}
+                    >
+                      <div>CGST</div>
+                      <div className="text-[0.84em] font-bold text-slate-700">Amt.</div>
+                    </th>
+                    <th
+                      className="border-r py-0.5 px-0.5 font-bold text-center leading-tight"
+                      style={{ width: "9.5%", borderColor }}
+                    >
+                      <div>SGST</div>
+                      <div className="text-[0.84em] font-bold text-slate-700">Amt.</div>
+                    </th>
+                    <th
+                      className="py-1 px-1 font-bold text-center"
+                      style={{ width: "12%", borderColor }}
+                    >
+                      Net Amount
+                    </th>
+                  </>
+                ) : (
+                  <>
+                    <th
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "4%", borderColor }}
+                    >
+                      Sr.
+                    </th>
+                    <th
+                      className="border-r py-1 px-1.5 text-left font-bold tracking-tight"
+                      style={{ width: "23%", borderColor }}
+                    >
+                      Product Name
+                    </th>
+                    <th
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "8%", borderColor }}
+                    >
+                      HSN
+                    </th>
+                    <th
+                      className="border-r py-0.5 px-0.5 font-bold text-center leading-tight"
+                      style={{ width: "10%", borderColor }}
+                    >
+                      <div>Nt.Wt.</div>
+                      <div className="text-[0.84em] font-bold text-slate-700">Pcs/Box</div>
+                    </th>
+                    <th
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "9%", borderColor }}
+                    >
+                      Rate
+                    </th>
+                    <th
+                      className="border-r py-1 px-1 font-bold text-center"
+                      style={{ width: "14%", borderColor }}
+                    >
+                      Taxable Amount
+                    </th>
+                    <th
+                      className="border-r py-1 px-0.5 font-bold text-center"
+                      style={{ width: "7%", borderColor }}
+                    >
+                      GST %
+                    </th>
+                    <th
+                      className="border-r py-0.5 px-0.5 font-bold text-center leading-tight"
+                      style={{ width: "11%", borderColor }}
+                    >
+                      <div>IGST</div>
+                      <div className="text-[0.84em] font-bold text-slate-700">Amt.</div>
+                    </th>
+                    <th
+                      className="py-1 px-1 font-bold text-center"
+                      style={{ width: "14%", borderColor }}
+                    >
+                      Net Amount
                     </th>
                   </>
                 )}
               </tr>
             </thead>
             <tbody>
-              {(invoice.items || []).map((item, index) => (
-                <tr
-                  key={item.id || index}
-                  className={`font-semibold ${template.tableDensity === "compact" ? "h-6" : "h-7 sm:h-8"
-                    }`}
-                >
-                  {isRaw ? (
-                    <>
-                      <td
-                        className="border-r py-1.5 px-1 text-center font-bold text-[1.25em]"
-                        style={{ borderColor }}
-                      >
-                        {index + 1}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-2 font-black uppercase text-[1.48em] tracking-tight truncate"
-                        style={{ borderColor }}
-                      >
-                        {renderET(
-                          "items_table_body",
-                          "Product Name",
-                          item.productName,
-                          undefined,
-                          {
-                            defaultFontSizePx: 16.0,
-                            uppercase: true,
-                            tooltip: "Product Name (Sample)",
-                          }
-                        )}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-1 text-center font-mono font-bold text-[1.32em]"
-                        style={{ borderColor }}
-                      >
-                        {renderET(
-                          "items_table_body",
-                          "HSN Code",
-                          item.hsn,
-                          undefined,
-                          {
-                            defaultFontSizePx: 14.0,
-                            tooltip: "HSN Code (Sample)",
-                          }
-                        )}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-1.5 text-right font-mono font-black text-[1.5em] tabular-nums"
-                        style={{ borderColor }}
-                      >
-                        {formatNumber(item.quantity, 3)}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-1.5 text-right font-mono font-black text-[1.5em] tabular-nums"
-                        style={{ borderColor }}
-                      >
-                        {formatNumber(item.rate, 2)}
-                      </td>
-                      <td
-                        className="py-1.5 px-1.5 text-right font-mono font-black text-[1.55em] tabular-nums"
-                        style={{ borderColor }}
-                      >
-                        {formatNumber(
-                          item.netAmount || (Number(item.quantity) * Number(item.rate)),
-                          2
-                        )}
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td
-                        className="border-r py-1.5 px-1 text-center font-bold text-[1.25em]"
-                        style={{ borderColor }}
-                      >
-                        {index + 1}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-2 font-black uppercase text-[1.48em] tracking-tight truncate"
-                        style={{ borderColor }}
-                      >
-                        {renderET(
-                          "items_table_body",
-                          "Product Name",
-                          item.productName,
-                          undefined,
-                          {
-                            defaultFontSizePx: 16.0,
-                            uppercase: true,
-                            tooltip: "Product Name (Sample)",
-                          }
-                        )}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-1 text-center font-mono font-bold text-[1.32em]"
-                        style={{ borderColor }}
-                      >
-                        {renderET(
-                          "items_table_body",
-                          "HSN Code",
-                          item.hsn,
-                          undefined,
-                          {
-                            defaultFontSizePx: 14.0,
-                            tooltip: "HSN Code (Sample)",
-                          }
-                        )}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-1.5 text-right font-mono font-black text-[1.5em] tabular-nums"
-                        style={{ borderColor }}
-                      >
-                        {formatNumber(item.quantity, 3)}
-                      </td>
-                      <td
-                        className="border-r py-1.5 px-1.5 text-right font-mono font-black text-[1.5em] tabular-nums"
-                        style={{ borderColor }}
-                      >
-                        {formatNumber(item.rate, 2)}
-                      </td>
-                      <td
-                        className="py-1.5 px-1.5 text-right font-mono font-black text-[1.55em] tabular-nums"
-                        style={{ borderColor }}
-                      >
-                        {formatNumber(item.taxableAmount, 2)}
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
+              {(invoice.items || []).map((item, index) => {
+                const itemGstPct = Number(item.gstRate || 0);
+                const taxable = Number(item.taxableAmount || (Number(item.quantity || 0) * Number(item.rate || 0)));
+                const itemCgst = item.cgstAmount !== undefined && item.cgstAmount !== null
+                  ? Number(item.cgstAmount)
+                  : !isInterstate && itemGstPct > 0
+                    ? Math.round(taxable * (itemGstPct / 2)) / 100
+                    : 0;
+                const itemSgst = item.sgstAmount !== undefined && item.sgstAmount !== null
+                  ? Number(item.sgstAmount)
+                  : !isInterstate && itemGstPct > 0
+                    ? Math.round(taxable * (itemGstPct / 2)) / 100
+                    : 0;
+                const itemIgst = item.igstAmount !== undefined && item.igstAmount !== null
+                  ? Number(item.igstAmount)
+                  : isInterstate && itemGstPct > 0
+                    ? Math.round(taxable * itemGstPct) / 100
+                    : 0;
+                const itemNet = item.netAmount !== undefined && item.netAmount !== null && Number(item.netAmount) > 0
+                  ? Number(item.netAmount)
+                  : taxable + (isInterstate ? itemIgst : (itemCgst + itemSgst));
+
+                return (
+                  <tr
+                    key={item.id || index}
+                    className={`font-normal ${template.tableDensity === "compact" ? "h-6 sm:h-7" : "h-7 sm:h-8"
+                      }`}
+                  >
+                    {isRaw ? (
+                      <>
+                        <td
+                          className="border-r py-1.5 px-1 text-center font-normal text-[1.06em]"
+                          style={{ borderColor }}
+                        >
+                          {index + 1}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-2 font-semibold uppercase text-[1.15em] sm:text-[1.18em] tracking-tight truncate overflow-hidden"
+                          style={{ borderColor }}
+                        >
+                          {renderET(
+                            "items_table_body",
+                            "Product Name",
+                            item.productName,
+                            undefined,
+                            {
+                              defaultFontSizePx: 12.5,
+                              uppercase: true,
+                              tooltip: "Product Name",
+                            }
+                          )}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-center font-mono font-normal text-[1.06em]"
+                          style={{ borderColor }}
+                        >
+                          {renderET(
+                            "items_table_body",
+                            "HSN Code",
+                            item.hsn,
+                            undefined,
+                            {
+                              defaultFontSizePx: 11.0,
+                              tooltip: "HSN Code",
+                            }
+                          )}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1.5 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(item.quantity, 3)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1.5 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(item.rate, 2)}
+                        </td>
+                        <td
+                          className="py-1.5 px-1.5 text-right font-mono font-normal text-[1.14em] sm:text-[1.16em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(
+                            item.netAmount || (Number(item.quantity) * Number(item.rate)),
+                            2
+                          )}
+                        </td>
+                      </>
+                    ) : !isInterstate ? (
+                      <>
+                        <td
+                          className="border-r py-1.5 px-0.5 text-center font-normal text-[1.06em]"
+                          style={{ borderColor }}
+                        >
+                          {index + 1}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1.5 font-semibold uppercase text-[1.15em] sm:text-[1.18em] tracking-tight truncate overflow-hidden"
+                          style={{ borderColor }}
+                          title={item.productName}
+                        >
+                          {renderET(
+                            "items_table_body",
+                            "Product Name",
+                            item.productName,
+                            undefined,
+                            {
+                              defaultFontSizePx: 12.5,
+                              uppercase: true,
+                              tooltip: "Product Name",
+                            }
+                          )}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-0.5 text-center font-mono font-normal text-[1.06em]"
+                          style={{ borderColor }}
+                        >
+                          {renderET(
+                            "items_table_body",
+                            "HSN Code",
+                            item.hsn,
+                            undefined,
+                            {
+                              defaultFontSizePx: 11.0,
+                              tooltip: "HSN Code",
+                            }
+                          )}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(item.quantity, 3)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(item.rate, 2)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(taxable, 2)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-0.5 text-center font-mono font-normal text-[1.05em] sm:text-[1.08em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {itemGstPct > 0 ? `${formatNumber(itemGstPct, 0)}%` : "-"}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(itemCgst, 2)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(itemSgst, 2)}
+                        </td>
+                        <td
+                          className="py-1.5 px-1 text-right font-mono font-normal text-[1.14em] sm:text-[1.16em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(itemNet, 2)}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td
+                          className="border-r py-1.5 px-0.5 text-center font-normal text-[1.06em]"
+                          style={{ borderColor }}
+                        >
+                          {index + 1}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1.5 font-semibold uppercase text-[1.15em] sm:text-[1.18em] tracking-tight truncate overflow-hidden"
+                          style={{ borderColor }}
+                          title={item.productName}
+                        >
+                          {renderET(
+                            "items_table_body",
+                            "Product Name",
+                            item.productName,
+                            undefined,
+                            {
+                              defaultFontSizePx: 12.5,
+                              uppercase: true,
+                              tooltip: "Product Name",
+                            }
+                          )}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-0.5 text-center font-mono font-normal text-[1.06em]"
+                          style={{ borderColor }}
+                        >
+                          {renderET(
+                            "items_table_body",
+                            "HSN Code",
+                            item.hsn,
+                            undefined,
+                            {
+                              defaultFontSizePx: 11.0,
+                              tooltip: "HSN Code",
+                            }
+                          )}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(item.quantity, 3)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(item.rate, 2)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(taxable, 2)}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-0.5 text-center font-mono font-normal text-[1.05em] sm:text-[1.08em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {itemGstPct > 0 ? `${formatNumber(itemGstPct, 0)}%` : "-"}
+                        </td>
+                        <td
+                          className="border-r py-1.5 px-1 text-right font-mono font-normal text-[1.12em] sm:text-[1.14em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(itemIgst, 2)}
+                        </td>
+                        <td
+                          className="py-1.5 px-1 text-right font-mono font-normal text-[1.14em] sm:text-[1.16em] tabular-nums"
+                          style={{ borderColor }}
+                        >
+                          {formatNumber(itemNet, 2)}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
 
               {/* Spacer rows that gracefully extend table through remaining page height */}
               {Array.from({ length: emptyRowsCount }).map((_, i) => (
@@ -2125,35 +2271,37 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     template.tableDensity === "compact" ? "h-6" : "h-7"
                   }
                 >
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td className="border-r" style={{ borderColor }}></td>
-                  <td></td>
+                  {Array.from({ length: colCount }).map((_, c) => (
+                    <td
+                      key={c}
+                      className={c < colCount - 1 ? "border-r" : ""}
+                      style={{ borderColor }}
+                    ></td>
+                  ))}
                 </tr>
               ))}
 
               {/* Dynamic filler row that absorbs remaining table height so column borders extend continuously to the total bar */}
               <tr ref={fillerRowRef} className="table-filler-row" data-filler="true" style={{ minHeight: "4px" }}>
-                <td className="border-r" style={{ borderColor }}></td>
-                <td className="border-r" style={{ borderColor }}></td>
-                <td className="border-r" style={{ borderColor }}></td>
-                <td className="border-r" style={{ borderColor }}></td>
-                <td className="border-r" style={{ borderColor }}></td>
-                <td></td>
+                {Array.from({ length: colCount }).map((_, c) => (
+                  <td
+                    key={c}
+                    className={c < colCount - 1 ? "border-r" : ""}
+                    style={{ borderColor }}
+                  ></td>
+                ))}
               </tr>
 
               {/* Total Summary Row */}
               <tr
-                className="border-t-2 border-b-2 font-black text-[1.12em] h-8"
+                className="border-t-2 border-b-2 font-bold text-[1.05em] sm:text-[1.08em] h-8 sm:h-9 bg-slate-50/70"
                 style={{ borderColor }}
               >
                 {isRaw ? (
                   <>
                     <td
                       colSpan={3}
-                      className="border-r py-1 px-2 text-center uppercase font-black text-[1.20em]"
+                      className="border-r py-1 px-2 text-center uppercase font-bold text-[1.02em]"
                       style={{ borderColor }}
                     >
                       {renderET(
@@ -2168,7 +2316,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       )}
                     </td>
                     <td
-                      className="border-r py-1 px-1.5 text-right font-mono font-black text-[1.32em] tabular-nums"
+                      className="border-r py-1 px-1.5 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.totalQuantity, 3)}
@@ -2178,17 +2326,74 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       style={{ borderColor }}
                     ></td>
                     <td
-                      className="py-1 px-2 text-right font-mono font-black text-[1.36em] tabular-nums"
+                      className="py-1 px-2 text-right font-mono font-bold text-[1.15em] sm:text-[1.18em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.grandTotal, 2)}
+                    </td>
+                  </>
+                ) : !isInterstate ? (
+                  <>
+                    <td
+                      colSpan={3}
+                      className="border-r py-1 px-1.5 text-center font-bold text-[1.02em] uppercase tracking-wide text-slate-800"
+                      style={{ borderColor }}
+                    >
+                      {renderET(
+                        "items_table_totals",
+                        "Table Total Label",
+                        "Total",
+                        undefined,
+                        {
+                          defaultFontSizePx: 12.5,
+                          uppercase: true,
+                        }
+                      )}
+                    </td>
+                    <td
+                      className="border-r py-1 px-1 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(invoice.totalQuantity, 3)}
+                    </td>
+                    <td
+                      className="border-r py-1 px-0.5"
+                      style={{ borderColor }}
+                    ></td>
+                    <td
+                      className="border-r py-1 px-1 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(invoice.totalTaxable, 2)}
+                    </td>
+                    <td
+                      className="border-r py-1 px-0.5"
+                      style={{ borderColor }}
+                    ></td>
+                    <td
+                      className="border-r py-1 px-1 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(totalCgstAmt, 2)}
+                    </td>
+                    <td
+                      className="border-r py-1 px-1 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(totalSgstAmt, 2)}
+                    </td>
+                    <td
+                      className="py-1 px-1 text-right font-mono font-bold text-[1.15em] sm:text-[1.18em] tabular-nums"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(totalNetItems, 2)}
                     </td>
                   </>
                 ) : (
                   <>
                     <td
                       colSpan={3}
-                      className="border-r py-1 px-2 text-center uppercase font-black text-[1.20em]"
+                      className="border-r py-1 px-1.5 text-center font-bold text-[1.02em] uppercase tracking-wide text-slate-800"
                       style={{ borderColor }}
                     >
                       {renderET(
@@ -2203,20 +2408,36 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       )}
                     </td>
                     <td
-                      className="border-r py-1 px-1.5 text-right font-mono font-black text-[1.32em] tabular-nums"
+                      className="border-r py-1 px-1 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.totalQuantity, 3)}
                     </td>
                     <td
-                      className="border-r py-1 px-1"
+                      className="border-r py-1 px-0.5"
                       style={{ borderColor }}
                     ></td>
                     <td
-                      className="py-1 px-2 text-right font-mono font-black text-[1.36em] tabular-nums"
+                      className="border-r py-1 px-1 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
                       style={{ borderColor }}
                     >
                       {formatNumber(invoice.totalTaxable, 2)}
+                    </td>
+                    <td
+                      className="border-r py-1 px-0.5"
+                      style={{ borderColor }}
+                    ></td>
+                    <td
+                      className="border-r py-1 px-1 text-right font-mono font-bold text-[1.12em] sm:text-[1.15em] tabular-nums"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(totalIgstAmt, 2)}
+                    </td>
+                    <td
+                      className="py-1 px-1 text-right font-mono font-bold text-[1.15em] sm:text-[1.18em] tabular-nums"
+                      style={{ borderColor }}
+                    >
+                      {formatNumber(totalNetItems, 2)}
                     </td>
                   </>
                 )}
@@ -2238,10 +2459,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           className="flex border-b-2 text-[0.98em] w-full flex-1 items-stretch"
           style={{ borderColor }}
         >
-          {/* Left Column: Words & Bank Details (62% width matching table columns 1-3) */}
+          {/* Left Column: Words & Bank Details (63% width matching table columns 1-6) */}
           <div
             className="border-r p-2.5 flex flex-col justify-between self-stretch shrink-0"
-            style={{ width: "62%", borderColor }}
+            style={{ width: "63%", borderColor }}
           >
             {template.showAmountInWords && (
               <div className="mb-1.5">
@@ -2367,13 +2588,13 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             )}
           </div>
 
-          {/* Right Column: Tax Breakdown & Grand Total (38% width matching table columns 4-6: Qty 12% + Rate 12% + Taxable 14%) */}
-          <div className="flex flex-col justify-between self-stretch shrink-0" style={{ width: "38%" }}>
+          {/* Right Column: Tax Breakdown & Grand Total (37% width matching table columns 7-10) */}
+          <div className="flex flex-col justify-between self-stretch shrink-0" style={{ width: "37%" }}>
             {/* Top: Tax Breakdown Table */}
-            <table className="w-full border-collapse table-fixed text-[1.05em] shrink-0" style={{ borderColor }}>
+            <table className="w-full border-collapse table-fixed text-[1.0em] shrink-0" style={{ borderColor }}>
               <colgroup>
-                <col style={{ width: "63.158%" }} />
-                <col style={{ width: "36.842%" }} />
+                <col style={{ width: "60%" }} />
+                <col style={{ width: "40%" }} />
               </colgroup>
               <tbody>
                 {template.showDiscount &&
@@ -2381,14 +2602,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 invoice.discount > 0 ? (
                   <tr className="border-b" style={{ borderColor }}>
                     <td
-                      className="border-r py-1.5 px-2.5 font-bold text-[1.25em] text-red-700 print:text-black"
-                      style={{ borderColor, width: "63.158%" }}
+                      className="border-r py-1 px-2 font-bold text-[1.12em] text-red-700 print:text-black"
+                      style={{ borderColor, width: "60%" }}
                     >
                       Less: Discount
                     </td>
                     <td
-                      className="py-1.5 px-2.5 text-right font-mono font-black text-[1.35em] text-red-700 print:text-black tabular-nums"
-                      style={{ width: "36.842%" }}
+                      className="py-1 px-2 text-right font-mono font-medium text-[1.18em] text-red-700 print:text-black tabular-nums"
+                      style={{ width: "40%" }}
                     >
                       - {formatNumber(invoice.discount, 2)}
                     </td>
@@ -2400,28 +2621,28 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     <>
                       <tr className="border-b" style={{ borderColor }}>
                         <td
-                          className="border-r py-1.5 px-2.5 font-bold text-[1.28em]"
-                          style={{ borderColor, width: "63.158%" }}
+                          className="border-r py-1 px-2 font-bold text-[1.12em]"
+                          style={{ borderColor, width: "60%" }}
                         >
                           CGST ({cgstPct}%)
                         </td>
                         <td
-                          className="py-1.5 px-2.5 text-right font-mono font-black text-[1.38em] tabular-nums"
-                          style={{ width: "36.842%" }}
+                          className="py-1 px-2 text-right font-mono font-medium text-[1.18em] tabular-nums"
+                          style={{ width: "40%" }}
                         >
                           {formatNumber(invoice.totalCgst, 2)}
                         </td>
                       </tr>
                       <tr className="border-b" style={{ borderColor }}>
                         <td
-                          className="border-r py-1.5 px-2.5 font-bold text-[1.28em]"
-                          style={{ borderColor, width: "63.158%" }}
+                          className="border-r py-1 px-2 font-bold text-[1.12em]"
+                          style={{ borderColor, width: "60%" }}
                         >
                           SGST ({sgstPct}%)
                         </td>
                         <td
-                          className="py-1.5 px-2.5 text-right font-mono font-black text-[1.38em] tabular-nums"
-                          style={{ width: "36.842%" }}
+                          className="py-1 px-2 text-right font-mono font-medium text-[1.18em] tabular-nums"
+                          style={{ width: "40%" }}
                         >
                           {formatNumber(invoice.totalSgst, 2)}
                         </td>
@@ -2430,14 +2651,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   ) : (
                     <tr className="border-b" style={{ borderColor }}>
                       <td
-                        className="border-r py-1.5 px-2.5 font-bold text-[1.28em]"
-                        style={{ borderColor, width: "63.158%" }}
+                        className="border-r py-1 px-2 font-bold text-[1.12em]"
+                        style={{ borderColor, width: "60%" }}
                       >
                         IGST ({igstPct}%)
                       </td>
                       <td
-                        className="py-1.5 px-2.5 text-right font-mono font-black text-[1.38em] tabular-nums"
-                        style={{ width: "36.842%" }}
+                        className="py-1 px-2 text-right font-mono font-medium text-[1.18em] tabular-nums"
+                        style={{ width: "40%" }}
                       >
                         {formatNumber(invoice.totalIgst, 2)}
                       </td>
@@ -2448,14 +2669,14 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 {/* Round Off Row */}
                 <tr className="border-b" style={{ borderColor }}>
                   <td
-                    className="border-r py-1.5 px-2.5 font-bold text-[1.28em]"
-                    style={{ borderColor, width: "63.158%" }}
+                    className="border-r py-1 px-2 font-bold text-[1.12em]"
+                    style={{ borderColor, width: "60%" }}
                   >
                     Round off
                   </td>
                   <td
-                    className="py-1.5 px-2.5 text-right font-mono font-black text-[1.38em] tabular-nums"
-                    style={{ width: "36.842%" }}
+                    className="py-1 px-2 text-right font-mono font-medium text-[1.18em] tabular-nums"
+                    style={{ width: "40%" }}
                   >
                     {formatNumber(invoice.roundOff || 0, 2)}
                   </td>
@@ -2467,19 +2688,19 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             <div className="flex-1 flex-grow w-full flex min-h-0">
               <div
                 className="border-r"
-                style={{ borderColor, width: "63.158%" }}
-              />
-              <div style={{ width: "36.842%" }} />
+                style={{ borderColor, width: "60%" }}
+              ></div>
+              <div style={{ width: "40%" }}></div>
             </div>
 
             {/* Bottom: Total Bill Amount Row Pinned Directly to Bottom */}
             <div
-              className="w-full border-t-2 font-black flex items-stretch bg-slate-50/50 mt-auto shrink-0"
+              className="w-full border-t-2 font-bold flex items-stretch bg-slate-50/50 mt-auto shrink-0"
               style={{ borderColor }}
             >
               <div
-                className="border-r py-2 px-2.5 font-black uppercase text-[1.18em] tracking-tight flex items-center"
-                style={{ borderColor, width: "63.158%" }}
+                className="border-r py-1.5 px-2 font-bold uppercase text-[1.12em] tracking-tight flex items-center"
+                style={{ borderColor, width: "60%" }}
               >
                 {renderET(
                   "grand_total",
@@ -2487,15 +2708,15 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   "TOTAL BILL AMOUNT",
                   undefined,
                   {
-                    defaultFontSizePx: 12.5,
+                    defaultFontSizePx: 12.0,
                     uppercase: true,
                   }
                 )}
               </div>
               <div
-                className="py-2 px-2.5 text-right font-black font-mono text-[1.48em] tabular-nums tracking-tight flex items-center justify-end"
+                className="py-1.5 px-2 text-right font-bold font-mono text-[1.32em] tabular-nums tracking-tight flex items-center justify-end"
                 style={{
-                  width: "36.842%",
+                  width: "40%",
                   color:
                     template.themeColor !== "#000000"
                       ? template.themeColor
@@ -2508,7 +2729,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   formatNumber(invoice.grandTotal, 2),
                   undefined,
                   {
-                    defaultFontSizePx: 15.5,
+                    defaultFontSizePx: 14.5,
                   }
                 )}
               </div>
@@ -2534,8 +2755,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         "terms_signatory",
         "Terms & Signature",
         <div className="flex text-[0.9em] w-full h-full p-2">
-          {/* Terms & Conditions (62% width matching table columns 1-3) */}
-          <div className="pr-2 space-y-0.5 leading-tight flex flex-col justify-center" style={{ width: "62%" }}>
+          {/* Terms & Conditions (63% width matching table columns 1-6) */}
+          <div className="pr-2 space-y-0.5 leading-tight flex flex-col justify-center" style={{ width: "63%" }}>
             {template.showTerms && (
               <>
                 <div className="font-bold underline text-[1.05em] flex items-center justify-between">
@@ -2599,10 +2820,10 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             ))}
           </div>
 
-          {/* Signature Box (38% width matching table columns 4-6) */}
+          {/* Signature Box (37% width matching table columns 7-10) */}
           <div
             className="text-center flex flex-col justify-between pl-2 border-l min-h-[65px] relative"
-            style={{ width: "38%", borderColor }}
+            style={{ width: "37%", borderColor }}
           >
             {template.showSignature && (
               <>
