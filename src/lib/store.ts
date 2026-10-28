@@ -49,7 +49,7 @@ export interface InvoiceElementMeta {
 
 export const INVOICE_ELEMENTS: InvoiceElementMeta[] = [
   { key: "devotional_header", label: "Devotional Header", defaultFontSizePx: 9.5, section: "Header" },
-  { key: "company_phones", label: "Header Phone Numbers", defaultFontSizePx: 9.0, section: "Header" },
+  { key: "company_phones", label: "Header Phone Numbers", defaultFontSizePx: 14.0, section: "Header" },
   { key: "monogram_text", label: "Logo Initials / Monogram", defaultFontSizePx: 18.0, section: "Header" },
   { key: "monogram_subtext", label: "Logo Subtext", defaultFontSizePx: 7.0, section: "Header" },
   { key: "company_name", label: "Company Legal Name", defaultFontSizePx: 42.0, section: "Header" },

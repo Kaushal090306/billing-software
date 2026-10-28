@@ -11,6 +11,7 @@ import {
   InvoiceElementStyle,
   INVOICE_ELEMENTS,
   defaultInvoiceTemplates,
+  defaultSectionsOrder,
   getFontFamilyCSS,
   getElementEffectiveFontSize,
 } from "@/lib/store";
@@ -568,6 +569,35 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       settings.templates?.find((t) => t.id === settings.activeTemplateId) ||
       defaultInvoiceTemplates[0];
 
+    // Normalize sections order: Ensure brand_header (heading container) is ALWAYS above invoice_title ('TAX INVOICE' row)
+    const effectiveSectionsOrder = useMemo(() => {
+      const order = [...(template.sectionsOrder || defaultSectionsOrder)];
+      const brandIdx = order.findIndex((s) => s.id === "brand_header");
+      const titleIdx = order.findIndex((s) => s.id === "invoice_title");
+      if (brandIdx !== -1 && titleIdx !== -1 && titleIdx < brandIdx) {
+        // Swap them so brand_header is above invoice_title
+        const temp = order[brandIdx];
+        order[brandIdx] = order[titleIdx];
+        order[titleIdx] = temp;
+      }
+      return order;
+    }, [template.sectionsOrder]);
+
+    // Auto-persist swapped order to template in business settings if previously saved in reverse order
+    useEffect(() => {
+      const order = template.sectionsOrder;
+      if (!order || !onUpdateTemplate) return;
+      const brandIdx = order.findIndex((s) => s.id === "brand_header");
+      const titleIdx = order.findIndex((s) => s.id === "invoice_title");
+      if (brandIdx !== -1 && titleIdx !== -1 && titleIdx < brandIdx) {
+        const newOrder = [...order];
+        const temp = newOrder[brandIdx];
+        newOrder[brandIdx] = newOrder[titleIdx];
+        newOrder[titleIdx] = temp;
+        onUpdateTemplate({ sectionsOrder: newOrder });
+      }
+    }, [template.sectionsOrder, onUpdateTemplate]);
+
     // Internal selection fallback if not controlled externally
     const [internalSelectedElement, setInternalSelectedElement] =
       useState<string | null>(null);
@@ -838,12 +868,12 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       showBottomResizeHandle = true
     ) => {
       const isHovered = hoveredSectionId === sectionId;
-      const secConfig = template.sectionsOrder?.find((s) => s.id === sectionId);
+      const secConfig = effectiveSectionsOrder.find((s) => s.id === sectionId);
       const customHeight = secConfig?.heightPx || secConfig?.minHeightPx;
-      const currentIndex = (template.sectionsOrder || []).findIndex(
+      const currentIndex = effectiveSectionsOrder.findIndex(
         (s) => s.id === sectionId
       );
-      const totalSections = (template.sectionsOrder || []).length;
+      const totalSections = effectiveSectionsOrder.length;
 
       const isItemsTable = sectionId === "items_table";
 
@@ -979,52 +1009,22 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       if (!template.showDevotionalHeader) return null;
       return renderSectionWrapper(
         "devotional",
-        "Devotional & Mobile",
+        "Devotional Header",
         <div
-          className="w-full h-full flex justify-between items-center text-[0.95em] font-bold border-b px-3 py-2 min-h-[34px]"
+          className="w-full h-full flex justify-center items-center text-[0.95em] font-bold border-b px-3 py-1.5 min-h-[30px]"
           style={{ borderColor }}
         >
-          <div className="w-1/4"></div>
-          <div className="w-2/4 text-center tracking-widest uppercase text-[1.05em]">
+          <div className="text-center tracking-widest uppercase font-semibold text-[1.05em]">
             {renderET(
               "devotional_header",
               "Devotional Header",
               devotionalHeader,
               (val) => onUpdateSettings?.({ devotionalHeader: val }),
               {
-                defaultFontSizePx: 10.0,
+                defaultFontSizePx: 10.5,
                 uppercase: true,
                 tooltip: "Click to edit devotional header text",
               }
-            )}
-          </div>
-          <div className="w-1/4 text-right leading-tight text-[0.9em] font-bold">
-            <div>
-              Mo.{" "}
-              {renderET(
-                "company_phones",
-                "Header Mobile 1",
-                companyMobile1,
-                (val) => onUpdateSettings?.({ phone: val }),
-                {
-                  defaultFontSizePx: 9.5,
-                  tooltip: "Click to edit primary mobile number",
-                }
-              )}
-            </div>
-            {companyMobile2 && companyMobile2.length > 0 && (
-              <div className="mt-0.5">
-                {renderET(
-                  "company_phones",
-                  "Header Mobile 2",
-                  companyMobile2,
-                  (val) => onUpdateSettings?.({ phoneAlt: val }),
-                  {
-                    defaultFontSizePx: 9.5,
-                    tooltip: "Click to edit alternate mobile number",
-                  }
-                )}
-              </div>
             )}
           </div>
         </div>
@@ -1050,7 +1050,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           style={{ borderColor }}
         >
           {/* Left: Dynamic Company Logo or Monogram */}
-          <div className="relative shrink-0 flex items-center justify-start min-w-[105px]">
+          <div className="relative shrink-0 flex items-center justify-start min-w-[125px]">
             <div
               onClick={() => interactive && setActivePopover("logo")}
               className={`relative ${interactive
@@ -1071,7 +1071,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
               ) : logoType !== "none" ? (
                 <div
-                  className="border-2 px-4 py-2.5 rounded-md text-center bg-white min-w-[105px] shadow-xs"
+                  className="border-2 px-4 py-2.5 rounded-md text-center bg-white min-w-[125px] shadow-xs"
                   style={{ borderColor }}
                 >
                   <span
@@ -1352,8 +1352,38 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             )}
           </div>
 
-          {/* Right: Invisible spacer to balance left logo and keep center title perfectly centered */}
-          <div className="shrink-0 min-w-[105px] hidden sm:block invisible pointer-events-none" aria-hidden="true"></div>
+          {/* Right: Mobile numbers in the row of heading */}
+          <div className="shrink-0 min-w-[125px] flex flex-col items-end justify-start self-start pt-0.5 text-right font-bold">
+            <div className="flex items-center justify-end gap-1.5 font-bold leading-tight text-black whitespace-nowrap text-[1.28em] sm:text-[1.32em]">
+              <span className="font-bold text-slate-900">Mo.</span>
+              <span className="font-mono font-bold tracking-tight text-black">
+                {renderET(
+                  "company_phones",
+                  "Header Mobile 1",
+                  companyMobile1,
+                  (val) => onUpdateSettings?.({ phone: val }),
+                  {
+                    defaultFontSizePx: 14.5,
+                    tooltip: "Click to edit primary mobile number",
+                  }
+                )}
+              </span>
+            </div>
+            {companyMobile2 && companyMobile2.length > 0 && (
+              <div className="font-mono font-bold tracking-tight text-black whitespace-nowrap mt-1 text-[1.28em] sm:text-[1.32em]">
+                {renderET(
+                  "company_phones",
+                  "Header Mobile 2",
+                  companyMobile2,
+                  (val) => onUpdateSettings?.({ phoneAlt: val }),
+                  {
+                    defaultFontSizePx: 14.5,
+                    tooltip: "Click to edit alternate mobile number",
+                  }
+                )}
+              </div>
+            )}
+          </div>
         </div>
       );
     };
@@ -3040,7 +3070,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     // =========================================================================
     const renderCustomFooter = () => {
       if (
-        !template.sectionsOrder.find((s) => s.id === "custom_footer")
+        !effectiveSectionsOrder.find((s) => s.id === "custom_footer")
           ?.enabled &&
         footerRightFields.length === 0
       ) {
@@ -3100,8 +3130,8 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
       custom_footer: renderCustomFooter,
     };
 
-    // Build ordered list of sections based on template.sectionsOrder
-    const orderedSections = (template.sectionsOrder || [])
+    // Build ordered list of sections based on normalized sectionsOrder (brand_header above invoice_title)
+    const orderedSections = effectiveSectionsOrder
       .filter((section) => section.enabled)
       .map((section) => {
         const renderer = sectionRenderers[section.id];
